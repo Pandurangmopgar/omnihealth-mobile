@@ -1,40 +1,44 @@
 {
   "expo": {
-    "name": "omnihealth-mobile",
+    "name": "OmniHealth",
     "slug": "omnihealth-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "icon": "./assets/images/icon.svg",
+    "scheme": "omnihealth-mobile",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "backgroundColor": "#0B1120",
+    "splash": {
+      "image": "./assets/images/splash.svg",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1120"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.omnihealth.mobile"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      }
+        "foregroundImage": "./assets/images/icon.svg",
+        "backgroundColor": "#0B1120"
+      },
+      "package": "com.omnihealth.mobile"
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/icon.svg"
     },
     "plugins": [
       "expo-router",
       [
-        "expo-splash-screen",
+        "expo-secure-store",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "faceIDPermission": "Allow OmniHealth to access your Face ID."
         }
-      ],
-      "expo-secure-store",
-      "expo-font"
+      ]
     ],
     "experiments": {
       "typedRoutes": true

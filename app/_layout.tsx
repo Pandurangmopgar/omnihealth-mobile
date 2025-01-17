@@ -1,39 +1,75 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+import { ClerkProvider, useAuth } from "@clerk/clerk-expo";
+import { Slot, useRouter, useSegments } from "expo-router";
+import { useEffect, useState } from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import * as SecureStore from "expo-secure-store";
+import { View, Text } from "react-native";
 
-import { useColorScheme } from '@/hooks/useColorScheme';
+const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+// Cache the Clerk token
+const tokenCache = {
+  async getToken(key: string) {
+    try {
+      return SecureStore.getItemAsync(key);
+    } catch (err) {
+      return null;
+    }
+  },
+  async saveToken(key: string, value: string) {
+    try {
+      return SecureStore.setItemAsync(key, value);
+    } catch (err) {
+      return;
+    }
+  },
+};
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+// This function will check if the user is authenticated on every navigation
+function InitialLayout() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
+    if (!isLoaded) return;
 
-  if (!loaded) {
-    return null;
+    // Only run the navigation logic once
+    if (!initialized) {
+      setInitialized(true);
+      const inTabsGroup = segments[0] === "(tabs)";
+
+      if (isSignedIn && !inTabsGroup) {
+        // Redirect to the home page if they're signed in and not in the (tabs) group
+        router.replace("/(tabs)");
+      } else if (!isSignedIn && inTabsGroup) {
+        // Redirect away from protected pages if they're not signed in
+        router.replace("/");
+      }
+    }
+  }, [isSignedIn, segments, isLoaded, initialized, router]);
+
+  if (!isLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Loading...</Text>
+      </View>
+    );
   }
 
+  return <Slot />;
+}
+
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <ClerkProvider 
+      publishableKey={CLERK_PUBLISHABLE_KEY}
+      tokenCache={tokenCache}
+    >
+      <SafeAreaProvider>
+        <InitialLayout />
+      </SafeAreaProvider>
+    </ClerkProvider>
   );
 }
