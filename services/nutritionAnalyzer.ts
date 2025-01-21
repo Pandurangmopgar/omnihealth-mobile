@@ -1,43 +1,25 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
-import { useAuth } from '@clerk/clerk-expo';
-import * as FileSystem from 'expo-file-system';
 
 // Initialize clients
 const genAI = new GoogleGenerativeAI(process.env.EXPO_PUBLIC_GOOGLE_API_KEY || "");
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
-// Initialize Supabase with custom fetch implementation for React Native
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = createClient(
+  process.env.EXPO_PUBLIC_SUPABASE_URL!,
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing Supabase configuration');
-}
-
-const supabase = createSupabaseClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: false,
-  }
-});
-
-// Initialize Redis with error handling
-const redisUrl = process.env.EXPO_PUBLIC_UPSTASH_REDIS_REST_URL;
-const redisToken = process.env.EXPO_PUBLIC_UPSTASH_REDIS_REST_TOKEN;
-
-if (!redisUrl || !redisToken) {
-  throw new Error('Missing Redis configuration');
-}
-
+// Initialize Redis
 const redis = new Redis({
-  url: redisUrl,
-  token: redisToken,
+  url: process.env.EXPO_PUBLIC_UPSTASH_REDIS_REST_URL!,
+  token: process.env.EXPO_PUBLIC_UPSTASH_REDIS_REST_TOKEN!,
 });
 
 const CACHE_TTL = 3600; // 1 hour
 
-export const systemPrompt = `You are NutrInfo, a specialized AI for analyzing food descriptions and images. Provide thorough nutritional analysis in JSON format.
+const systemPrompt = `You are NutrInfo, a specialized AI for analyzing food descriptions and images. Provide thorough nutritional analysis in JSON format.
 
 For text descriptions:
 1. Parse the food description and quantity
@@ -48,7 +30,7 @@ For text descriptions:
 
 Return analysis in this exact JSON structure:
 {
-  "analysis_type": "text",
+  "analysis_type": "text" | "image",
   "basic_info": {
     "food_name": string,
     "portion_size": string,
@@ -75,7 +57,7 @@ Return analysis in this exact JSON structure:
     "local_options": string[]
   },
   "source_reliability": "verified" | "estimated",
-  "meal_type": string
+  "meal_type": "breakfast" | "lunch" | "dinner" | "snack"
 }`;
 
 const formatAIResponse = (responseText: string) => {
@@ -99,7 +81,7 @@ export const getDailyGoals = async (userId: string) => {
       .eq('user_id', userId)
       .single();
 
-    if (error) throw error;
+    if (error && error.code !== 'PGRST116') throw error;
 
     return data || {
       daily_calories: 2000,
@@ -115,31 +97,6 @@ export const getDailyGoals = async (userId: string) => {
       daily_carbs: 275,
       daily_fat: 55
     };
-  }
-};
-
-export const setDailyGoals = async (userId: string, goals: {
-  daily_calories: number;
-  daily_protein: number;
-  daily_carbs: number;
-  daily_fat: number;
-}) => {
-  try {
-    const { error } = await supabase
-      .from('nutrition_goals')
-      .upsert({
-        user_id: userId,
-        ...goals,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id'
-      });
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error setting goals:', error);
-    throw new Error(`Failed to set goals: ${error.message}`);
   }
 };
 
@@ -209,19 +166,7 @@ const updateDailyProgress = async (userId: string, nutritionalContent: any) => {
 
     if (error) throw error;
 
-    // Get goals to calculate progress
-    const goals = await getDailyGoals(userId);
-    
-    return {
-      ...newProgress,
-      goals,
-      progress: {
-        calories: (newProgress.calories / goals.daily_calories) * 100,
-        protein: (newProgress.protein / goals.daily_protein) * 100,
-        carbs: (newProgress.carbs / goals.daily_carbs) * 100,
-        fat: (newProgress.fat / goals.daily_fat) * 100
-      }
-    };
+    return newProgress;
   } catch (error) {
     console.error('Error updating progress:', error);
     throw new Error(`Failed to update progress: ${error.message}`);
@@ -230,84 +175,31 @@ const updateDailyProgress = async (userId: string, nutritionalContent: any) => {
 
 const storeAnalysisResult = async (userId: string, analysis: any) => {
   try {
-    const { data, error } = await supabase
-      .from('nutrition_history')
+    // Ensure meal_type is one of the allowed values
+    const validMealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
+    const mealType = validMealTypes.includes(analysis.meal_type?.toLowerCase())
+      ? analysis.meal_type.toLowerCase()
+      : 'snack'; // Default to snack if invalid or missing
+
+    const { error } = await supabase
+      .from('nutrition_analysis')
       .insert([{
         user_id: userId,
-        analysis_type: analysis.analysis_type,
+        date: new Date().toISOString().split('T')[0],
+        meal_type: mealType,
         food_name: analysis.basic_info.food_name,
         calories: analysis.nutritional_content.calories,
         protein: analysis.nutritional_content.macronutrients.protein.amount,
         carbs: analysis.nutritional_content.macronutrients.carbs.amount,
-        fats: analysis.nutritional_content.macronutrients.fats.amount,
-        meal_type: analysis.meal_type || 'snack',
+        fat: analysis.nutritional_content.macronutrients.fats.amount,
         analysis_data: analysis,
         created_at: new Date().toISOString()
       }]);
 
     if (error) throw error;
-    return data;
   } catch (error) {
     console.error('Error storing analysis result:', error);
-    throw new Error(`Failed to store analysis result: ${error.message}`);
-  }
-};
-
-export const getDailyProgress = async (userId: string) => {
-  const today = new Date().toISOString().split('T')[0];
-  const cacheKey = `progress:${userId}:${today}`;
-
-  try {
-    // Try Redis first
-    const cachedProgress = await redis.get(cacheKey);
-    if (cachedProgress) {
-      const progress = JSON.parse(cachedProgress);
-      const goals = await getDailyGoals(userId);
-      return {
-        ...progress,
-        goals,
-        progress: {
-          calories: (progress.calories / goals.daily_calories) * 100,
-          protein: (progress.protein / goals.daily_protein) * 100,
-          carbs: (progress.carbs / goals.daily_carbs) * 100,
-          fat: (progress.fat / goals.daily_fat) * 100
-        }
-      };
-    }
-
-    // Fallback to Supabase
-    const { data, error } = await supabase
-      .from('progress_tracking')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('date', today)
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error;
-
-    const progress = data || {
-      calories: 0,
-      protein: 0,
-      carbs: 0,
-      fat: 0,
-      meals_logged: 0
-    };
-
-    const goals = await getDailyGoals(userId);
-
-    return {
-      ...progress,
-      goals,
-      progress: {
-        calories: (progress.calories / goals.daily_calories) * 100,
-        protein: (progress.protein / goals.daily_protein) * 100,
-        carbs: (progress.carbs / goals.daily_carbs) * 100,
-        fat: (progress.fat / goals.daily_fat) * 100
-      }
-    };
-  } catch (error) {
-    console.error('Error fetching progress:', error);
-    throw new Error(`Failed to fetch progress: ${error.message}`);
+    throw error;
   }
 };
 
@@ -374,5 +266,63 @@ export const analyzeNutrition = async (
   } catch (error) {
     console.error('Error in nutrition analysis:', error);
     throw new Error(`Nutrition analysis failed: ${error.message}`);
+  }
+};
+
+export const getDailyProgress = async (userId: string) => {
+  const today = new Date().toISOString().split('T')[0];
+  const cacheKey = `progress:${userId}:${today}`;
+
+  try {
+    // Try Redis first
+    const cachedProgress = await redis.get(cacheKey);
+    if (cachedProgress) {
+      const progress = JSON.parse(cachedProgress);
+      const goals = await getDailyGoals(userId);
+      return {
+        ...progress,
+        goals,
+        progress: {
+          calories: (progress.calories / goals.daily_calories) * 100,
+          protein: (progress.protein / goals.daily_protein) * 100,
+          carbs: (progress.carbs / goals.daily_carbs) * 100,
+          fat: (progress.fat / goals.daily_fat) * 100
+        }
+      };
+    }
+
+    // Fallback to Supabase
+    const { data, error } = await supabase
+      .from('progress_tracking')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('date', today)
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+
+    const progress = data || {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      meals_logged: 0
+    };
+
+    const goals = await getDailyGoals(userId);
+
+    return {
+      ...progress,
+      goals,
+      progress: {
+        calories: (progress.calories / goals.daily_calories) * 100,
+        protein: (progress.protein / goals.daily_protein) * 100,
+        carbs: (progress.carbs / goals.daily_carbs) * 100,
+        fat: (progress.fat / goals.daily_fat) * 100
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching progress:', error);
+    throw new Error(`Failed to fetch progress: ${error.message}`);
   }
 };

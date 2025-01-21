@@ -112,8 +112,25 @@ export default function NutritionAnalyzer() {
     setResult(null);
 
     try {
-      const analysis = await analyzeNutrition(type, content, userId);
+      // Get current time to determine meal type
+      const hour = new Date().getHours();
+      let mealType = 'snack';
+      if (hour >= 5 && hour < 11) mealType = 'breakfast';
+      else if (hour >= 11 && hour < 16) mealType = 'lunch';
+      else if (hour >= 16 && hour < 22) mealType = 'dinner';
+
+      const { analysis, progress } = await analyzeNutrition(type, content, userId);
+      
+      // Override the meal type based on time of day
+      analysis.meal_type = mealType;
+      
       setResult(analysis);
+      
+      // Show success message with calories
+      Alert.alert(
+        'Analysis Complete',
+        `Successfully analyzed ${analysis.basic_info.food_name}.\nCalories: ${analysis.nutritional_content.calories} kcal`
+      );
     } catch (error) {
       console.error('Error analyzing food:', error);
       Alert.alert(
@@ -132,6 +149,104 @@ export default function NutritionAnalyzer() {
     }
   };
 
+  const renderAnalysisResult = () => {
+    if (!result) return null;
+
+    return (
+      <MotiView
+        from={{ opacity: 0, translateY: 20 }}
+        animate={{ opacity: 1, translateY: 0 }}
+        transition={{ type: 'timing', duration: 300 }}
+        style={styles.resultContainer}
+      >
+        <View style={styles.resultHeader}>
+          <Text style={styles.foodName}>{result.basic_info.food_name}</Text>
+          <Text style={styles.mealType}>
+            <Ionicons name="time-outline" size={16} color="#4C6EF5" /> {result.meal_type.charAt(0).toUpperCase() + result.meal_type.slice(1)}
+          </Text>
+          {result.basic_info.portion_size && (
+            <Text style={styles.portionSize}>
+              <Ionicons name="restaurant-outline" size={16} color="rgba(255, 255, 255, 0.7)" /> {result.basic_info.portion_size}
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.nutritionGrid}>
+          <View style={styles.nutritionItem}>
+            <Ionicons name="flame-outline" size={24} color="#4C6EF5" />
+            <Text style={styles.nutritionLabel}>Calories</Text>
+            <Text style={styles.nutritionValue}>
+              {result.nutritional_content.calories}
+            </Text>
+            <Text style={styles.nutritionUnit}>kcal</Text>
+          </View>
+          <View style={styles.nutritionItem}>
+            <Ionicons name="barbell-outline" size={24} color="#4C6EF5" />
+            <Text style={styles.nutritionLabel}>Protein</Text>
+            <Text style={styles.nutritionValue}>
+              {result.nutritional_content.macronutrients.protein.amount}
+            </Text>
+            <Text style={styles.nutritionUnit}>g</Text>
+          </View>
+          <View style={styles.nutritionItem}>
+            <Ionicons name="leaf-outline" size={24} color="#4C6EF5" />
+            <Text style={styles.nutritionLabel}>Carbs</Text>
+            <Text style={styles.nutritionValue}>
+              {result.nutritional_content.macronutrients.carbs.amount}
+            </Text>
+            <Text style={styles.nutritionUnit}>g</Text>
+          </View>
+          <View style={styles.nutritionItem}>
+            <Ionicons name="water-outline" size={24} color="#4C6EF5" />
+            <Text style={styles.nutritionLabel}>Fats</Text>
+            <Text style={styles.nutritionValue}>
+              {result.nutritional_content.macronutrients.fats.amount}
+            </Text>
+            <Text style={styles.nutritionUnit}>g</Text>
+          </View>
+        </View>
+
+        {result.health_analysis && (
+          <View style={styles.healthAnalysis}>
+            <Text style={styles.sectionTitle}>
+              <Ionicons name="medical-outline" size={20} color="#fff" /> Health Analysis
+            </Text>
+            {result.health_analysis.benefits.length > 0 && (
+              <View style={styles.benefitsContainer}>
+                <Text style={styles.benefitsTitle}>
+                  <Ionicons name="checkmark-circle-outline" size={18} color="#4C6EF5" /> Benefits
+                </Text>
+                {result.health_analysis.benefits.map((benefit, index) => (
+                  <Text key={index} style={styles.benefitItem}>• {benefit}</Text>
+                ))}
+              </View>
+            )}
+            {result.health_analysis.considerations.length > 0 && (
+              <View style={styles.considerationsContainer}>
+                <Text style={styles.considerationsTitle}>
+                  <Ionicons name="information-circle-outline" size={18} color="#4C6EF5" /> Considerations
+                </Text>
+                {result.health_analysis.considerations.map((consideration, index) => (
+                  <Text key={index} style={styles.considerationItem}>• {consideration}</Text>
+                ))}
+              </View>
+            )}
+            {result.health_analysis.allergens.length > 0 && (
+              <View style={styles.allergensContainer}>
+                <Text style={styles.allergensTitle}>
+                  <Ionicons name="alert-circle-outline" size={18} color="#4C6EF5" /> Allergens
+                </Text>
+                {result.health_analysis.allergens.map((allergen, index) => (
+                  <Text key={index} style={styles.allergenItem}>• {allergen}</Text>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+      </MotiView>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -146,6 +261,7 @@ export default function NutritionAnalyzer() {
         <ScrollView
           style={styles.content}
           contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
           <View style={styles.inputSection}>
             <View style={styles.imageInputs}>
@@ -157,7 +273,7 @@ export default function NutritionAnalyzer() {
                   colors={['#4C6EF5', '#3D5AFE']}
                   style={styles.buttonGradient}
                 >
-                  <Ionicons name="camera" size={24} color="#fff" />
+                  <Ionicons name="camera-outline" size={24} color="#fff" />
                   <Text style={styles.buttonText}>Take Photo</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -170,7 +286,7 @@ export default function NutritionAnalyzer() {
                   colors={['#4C6EF5', '#3D5AFE']}
                   style={styles.buttonGradient}
                 >
-                  <Ionicons name="images" size={24} color="#fff" />
+                  <Ionicons name="images-outline" size={24} color="#fff" />
                   <Text style={styles.buttonText}>Pick Image</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -199,7 +315,7 @@ export default function NutritionAnalyzer() {
                   style={styles.submitButtonGradient}
                 >
                   <Ionicons
-                    name="arrow-forward"
+                    name="arrow-forward-outline"
                     size={24}
                     color={textInput.trim() ? '#fff' : '#6B7280'}
                   />
@@ -231,37 +347,7 @@ export default function NutritionAnalyzer() {
             </MotiView>
           )}
 
-          {result && (
-            <MotiView
-              from={{ opacity: 0, translateY: 20 }}
-              animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'timing', duration: 300 }}
-              style={styles.resultContainer}
-            >
-              <Text style={styles.foodName}>{result.basic_info.food_name}</Text>
-              
-              <View style={styles.nutritionGrid}>
-                <View style={styles.nutritionItem}>
-                  <Text style={styles.nutritionLabel}>Calories</Text>
-                  <Text style={styles.nutritionValue}>{result.nutritional_content.calories}</Text>
-                </View>
-                <View style={styles.nutritionItem}>
-                  <Text style={styles.nutritionLabel}>Protein</Text>
-                  <Text style={styles.nutritionValue}>{result.nutritional_content.macronutrients.protein.amount}g</Text>
-                </View>
-                <View style={styles.nutritionItem}>
-                  <Text style={styles.nutritionLabel}>Carbs</Text>
-                  <Text style={styles.nutritionValue}>{result.nutritional_content.macronutrients.carbs.amount}g</Text>
-                </View>
-                <View style={styles.nutritionItem}>
-                  <Text style={styles.nutritionLabel}>Fats</Text>
-                  <Text style={styles.nutritionValue}>{result.nutritional_content.macronutrients.fats.amount}g</Text>
-                </View>
-              </View>
-
-              <Text style={styles.analysis}>{result.health_analysis.benefits.join(', ')}</Text>
-            </MotiView>
-          )}
+          {renderAnalysisResult()}
         </ScrollView>
       </LinearGradient>
     </View>
@@ -378,21 +464,35 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 20,
+    marginTop: 20,
+  },
+  resultHeader: {
+    marginBottom: 16,
   },
   foodName: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 16,
+    marginBottom: 4,
+  },
+  mealType: {
+    fontSize: 16,
+    color: '#4C6EF5',
+    marginBottom: 4,
+  },
+  portionSize: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   nutritionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   nutritionItem: {
     width: '50%',
-    padding: 8,
+    padding: 10,
+    alignItems: 'center',
   },
   nutritionLabel: {
     color: 'rgba(255, 255, 255, 0.7)',
@@ -401,12 +501,65 @@ const styles = StyleSheet.create({
   },
   nutritionValue: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: 'bold',
   },
-  analysis: {
-    color: 'rgba(255, 255, 255, 0.9)',
+  nutritionUnit: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  healthAnalysis: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    paddingTop: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 12,
+  },
+  benefitsContainer: {
+    marginBottom: 12,
+  },
+  benefitsTitle: {
     fontSize: 16,
-    lineHeight: 24,
+    color: '#4C6EF5',
+    marginBottom: 8,
+  },
+  benefitItem: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    marginBottom: 4,
+    paddingLeft: 8,
+  },
+  considerationsContainer: {
+    marginBottom: 12,
+  },
+  considerationsTitle: {
+    fontSize: 16,
+    color: '#4C6EF5',
+    marginBottom: 8,
+  },
+  considerationItem: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    marginBottom: 4,
+    paddingLeft: 8,
+  },
+  allergensContainer: {
+    marginBottom: 12,
+  },
+  allergensTitle: {
+    fontSize: 16,
+    color: '#4C6EF5',
+    marginBottom: 8,
+  },
+  allergenItem: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    marginBottom: 4,
+    paddingLeft: 8,
   },
 });
