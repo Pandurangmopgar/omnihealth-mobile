@@ -1,14 +1,13 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Platform, Dimensions, SafeAreaView, StatusBar } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Platform, Dimensions, SafeAreaView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/clerk-expo';
-import { Link, router } from 'expo-router';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import { MotiView } from 'moti';
+import { StatusBar } from 'expo-status-bar';
 
 const { width } = Dimensions.get('window');
 
@@ -16,29 +15,34 @@ const HEALTH_ASSISTANTS = [
   {
     id: 'nutrition',
     title: 'Nutrition Analyzer',
-    description: 'Get personalized nutrition advice',
-    icon: 'nutrition-outline',
+    description: 'Get personalized nutrition advice and meal recommendations based on your health goals.',
+    icon: 'nutrition',
     gradient: ['#4ade80', '#22c55e'],
   },
   {
     id: 'exercise',
     title: 'Exercise Coach',
-    description: 'Tailored workout plans',
-    icon: 'barbell-outline',
+    description: 'Tailored workout plans and exercise routines designed for your fitness level.',
+    icon: 'barbell',
     gradient: ['#60a5fa', '#3b82f6'],
   },
   {
     id: 'diet',
     title: 'Diet Planner',
-    description: 'Customized meal plans',
-    icon: 'restaurant-outline',
+    description: 'Customized meal plans and dietary recommendations for your health journey.',
+    icon: 'restaurant',
     gradient: ['#fbbf24', '#f59e0b'],
+  },
+  {
+    id: 'mental',
+    title: 'Mental Wellness',
+    description: 'Support and guidance for mental health, stress management, and mindfulness.',
+    icon: 'brain',
+    gradient: ['#c084fc', '#a855f7'],
   }
 ];
 
 export default function HomeScreen() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   const { isSignedIn } = useAuth();
   const router = useRouter();
@@ -47,200 +51,151 @@ export default function HomeScreen() {
     return null;
   }
 
+  const handleAssistantPress = (id: string) => {
+    router.push('/(tabs)/aiassistant');
+  };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: '#0B1120' }]}>
-      <StatusBar barStyle="light-content" />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: insets.bottom + 100 },
-        ]}
-        showsVerticalScrollIndicator={false}
+    <View style={styles.container}>
+      <StatusBar style="light" />
+      <LinearGradient
+        colors={['#0B1120', '#1A237E']}
+        style={styles.gradient}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <Text style={styles.title}>OmniHealth</Text>
-            <TouchableOpacity 
-              style={styles.signInButton}
-              onPress={() => router.push('/(tabs)/profile')}
-            >
-              <Text style={styles.signInText}>
-                Profile
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.subtitle}>
-            Transform your health journey with AI
-          </Text>
-        </View>
-
-        {/* Get Started Button */}
-        <TouchableOpacity
-          style={styles.getStartedButton}
-          onPress={() => router.push('/(tabs)/aiassistant')}
-        >
-          <LinearGradient
-            colors={['#4C6EF5', '#228BE6']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.getStartedGradient}
+        <SafeAreaView style={styles.content}>
+          <Animated.View 
+            entering={FadeIn.delay(200)}
+            style={styles.header}
           >
-            <Text style={styles.getStartedText}>Get Started</Text>
-            <Ionicons name="arrow-forward" size={20} color="#fff" />
-          </LinearGradient>
-        </TouchableOpacity>
+            <Text style={styles.title}>Health Assistant</Text>
+            <Text style={styles.subtitle}>Choose your health companion</Text>
+          </Animated.View>
 
-        {/* Health Assistants */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Health Assistants</Text>
-          </View>
-
-          <View style={styles.grid}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
             {HEALTH_ASSISTANTS.map((assistant, index) => (
-              <Animated.View
+              <MotiView
                 key={assistant.id}
-                entering={FadeInDown.delay(index * 100)}
-                style={styles.gridItem}
+                from={{ opacity: 0, translateY: 50 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{
+                  type: 'timing',
+                  duration: 500,
+                  delay: index * 100,
+                }}
               >
                 <TouchableOpacity
-                  onPress={() => router.push({
-                    pathname: '/(tabs)/aiassistant',
-                    params: { service: assistant.id }
-                  })}
+                  style={styles.card}
+                  onPress={() => handleAssistantPress(assistant.id)}
+                  activeOpacity={0.9}
                 >
                   <LinearGradient
                     colors={assistant.gradient}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={styles.card}
+                    style={styles.cardGradient}
                   >
-                    <View style={styles.cardIcon}>
-                      <Ionicons 
-                        name={assistant.icon as keyof typeof Ionicons.glyphMap} 
-                        size={24} 
-                        color="#fff" 
-                      />
+                    <View style={styles.cardContent}>
+                      <View style={styles.iconContainer}>
+                        <Ionicons name={assistant.icon as keyof typeof Ionicons.glyphMap} size={32} color="#fff" />
+                      </View>
+                      <View style={styles.textContainer}>
+                        <Text style={styles.cardTitle}>{assistant.title}</Text>
+                        <Text style={styles.cardDescription}>{assistant.description}</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={24} color="#fff" style={styles.arrow} />
                     </View>
-                    <Text style={styles.cardTitle}>{assistant.title}</Text>
-                    <Text style={styles.cardDescription}>
-                      {assistant.description}
-                    </Text>
                   </LinearGradient>
                 </TouchableOpacity>
-              </Animated.View>
+              </MotiView>
             ))}
-          </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          </ScrollView>
+        </SafeAreaView>
+      </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0B1120',
   },
-  scrollView: {
+  gradient: {
     flex: 1,
   },
   content: {
-    padding: 16,
+    flex: 1,
+    paddingTop: Platform.OS === 'android' ? 20 : 0,
   },
   header: {
-    marginBottom: 24,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    padding: 20,
   },
   title: {
     fontSize: 32,
-    fontWeight: '700',
+    fontWeight: 'bold',
     color: '#fff',
-  },
-  signInButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  signInText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 4,
   },
-  getStartedButton: {
-    marginBottom: 32,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  getStartedGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 8,
-  },
-  getStartedText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  section: {
-    marginBottom: 32,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  gridItem: {
+  scrollView: {
     flex: 1,
-    minWidth: width * 0.44,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 100,
   },
   card: {
-    borderRadius: 20,
-    padding: 20,
-    height: 180,
-  },
-  cardIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+  },
+  cardGradient: {
+    padding: 20,
+  },
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  textContainer: {
+    flex: 1,
+    marginRight: 16,
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   cardDescription: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.9)',
+    lineHeight: 20,
+  },
+  arrow: {
+    opacity: 0.9,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,14 @@ import {
   ActivityIndicator,
   StyleSheet,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { GoogleGenerativeAI, Part } from '@google/generative-ai';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView } from 'moti';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
@@ -38,6 +42,7 @@ const model = genAI.getGenerativeModel({
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  id: string;
 }
 
 const INITIAL_PROMPT = `You are an AI health assistant specializing in nutrition, exercise, and diet planning. 
@@ -52,6 +57,19 @@ export default function AIAssistant() {
   const [isLoading, setIsLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const chatRef = useRef<any>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
+  const [showNewChatButton, setShowNewChatButton] = useState(false);
+
+  useEffect(() => {
+    setShowNewChatButton(messages.length > 0);
+  }, [messages]);
+
+  const startNewChat = () => {
+    setMessages([]);
+    setInput('');
+    setShowNewChatButton(false);
+  };
 
   // Initialize chat session
   const initChat = useCallback(async () => {
@@ -74,12 +92,21 @@ export default function AIAssistant() {
   // Initialize chat on component mount
   React.useEffect(() => {
     initChat();
-  }, [initChat]);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 1000,
+      useNativeDriver: true,
+    }).start();
+  }, [initChat, fadeAnim]);
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || isLoading || !chatRef.current) return;
 
-    const userMessage: Message = { role: 'user', content: input.trim() };
+    const userMessage: Message = {
+      role: 'user',
+      content: input.trim(),
+      id: Date.now().toString(),
+    };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
@@ -97,14 +124,16 @@ export default function AIAssistant() {
       // Update messages with properly typed response
       const assistantMessage: Message = {
         role: 'assistant',
-        content: text
+        content: text,
+        id: (Date.now() + 1).toString(),
       };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Error:', error);
       const errorMessage: Message = {
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.'
+        content: 'Sorry, I encountered an error. Please try again.',
+        id: (Date.now() + 1).toString(),
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -115,81 +144,135 @@ export default function AIAssistant() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      
-      <View style={styles.content}>
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.messagesContainer}
-          contentContainerStyle={styles.messagesContent}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+      <View style={styles.mainContent}>
+        <LinearGradient
+          colors={['#0B1120', '#1A237E']}
+          style={styles.gradient}
         >
-          {messages.map((message, index) => (
-            <View
-              key={index}
-              style={[
-                styles.messageWrapper,
-                message.role === 'user' ? styles.userMessage : styles.assistantMessage,
-              ]}
-            >
-              {message.role === 'assistant' && (
-                <View style={styles.assistantIcon}>
-                  <Ionicons name="medical" size={16} color="#fff" />
-                </View>
-              )}
-              <View style={[
-                styles.messageContent,
-                message.role === 'user' ? styles.userMessageContent : styles.assistantMessageContent
-              ]}>
-                <Text style={[
-                  styles.messageText,
-                  message.role === 'user' ? styles.userMessageText : styles.assistantMessageText,
-                ]}>
-                  {message.content}
-                </Text>
-              </View>
-            </View>
-          ))}
-          {isLoading && (
-            <View style={[styles.messageWrapper, styles.assistantMessage]}>
-              <View style={styles.assistantIcon}>
-                <Ionicons name="medical" size={16} color="#fff" />
-              </View>
-              <View style={[styles.messageContent, styles.loadingContent]}>
-                <ActivityIndicator color="#4C6EF5" />
-              </View>
-            </View>
-          )}
-        </ScrollView>
-
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-          style={styles.inputContainer}
-        >
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.input}
-              value={input}
-              onChangeText={setInput}
-              placeholder="Ask me anything about health..."
-              placeholderTextColor="#6B7280"
-              multiline={false}
-              returnKeyType="send"
-              onSubmitEditing={handleSend}
-            />
-            <TouchableOpacity
-              style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
-              onPress={handleSend}
-              disabled={!input.trim() || isLoading}
-            >
-              <Ionicons
-                name="send"
-                size={20}
-                color={input.trim() ? '#fff' : '#6B7280'}
-              />
-            </TouchableOpacity>
+          <View style={[styles.header, { marginTop: insets.top }]}>
+            <Text style={styles.headerTitle}>AI Assistant</Text>
+            {showNewChatButton && (
+              <TouchableOpacity onPress={startNewChat} style={styles.newChatButton}>
+                <LinearGradient
+                  colors={['#4C6EF5', '#3D5AFE']}
+                  style={styles.newChatGradient}
+                >
+                  <Ionicons name="add" size={20} color="#fff" />
+                  <Text style={styles.newChatText}>New Chat</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
           </View>
-        </KeyboardAvoidingView>
+
+          <View style={[styles.chatContainer, { marginBottom: 80 }]}>
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.messagesContainer}
+              contentContainerStyle={[
+                styles.messagesContent,
+                { paddingBottom: 100 }
+              ]}
+              onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+            >
+              {messages.map((message) => (
+                <MotiView
+                  key={message.id}
+                  from={{ opacity: 0, translateY: 10 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={{ type: 'timing', duration: 300 }}
+                  style={[
+                    styles.messageWrapper,
+                    message.role === 'user' ? styles.userMessage : styles.assistantMessage,
+                  ]}
+                >
+                  {message.role === 'assistant' && (
+                    <LinearGradient
+                      colors={['#4C6EF5', '#3D5AFE']}
+                      style={styles.assistantIcon}
+                    >
+                      <Ionicons name="medical" size={16} color="#fff" />
+                    </LinearGradient>
+                  )}
+                  <MotiView
+                    style={[
+                      styles.messageContent,
+                      message.role === 'user' ? styles.userMessageContent : styles.assistantMessageContent,
+                    ]}
+                  >
+                    <Text style={[
+                      styles.messageText,
+                      message.role === 'user' ? styles.userMessageText : styles.assistantMessageText,
+                    ]}>
+                      {message.content}
+                    </Text>
+                  </MotiView>
+                </MotiView>
+              ))}
+              
+              {isLoading && (
+                <MotiView
+                  from={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  style={[styles.messageWrapper, styles.assistantMessage]}
+                >
+                  <LinearGradient
+                    colors={['#4C6EF5', '#3D5AFE']}
+                    style={styles.assistantIcon}
+                  >
+                    <Ionicons name="medical" size={16} color="#fff" />
+                  </LinearGradient>
+                  <View style={[styles.messageContent, styles.loadingContent]}>
+                    <ActivityIndicator color="#4C6EF5" />
+                  </View>
+                </MotiView>
+              )}
+            </ScrollView>
+          </View>
+
+          <View style={[styles.bottomContainer, { height: 80 }]}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+              style={styles.keyboardAvoidingView}
+            >
+              <View style={styles.inputContainer}>
+                <MotiView
+                  from={{ opacity: 0, translateY: 20 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={{ type: 'timing', duration: 500 }}
+                  style={styles.inputWrapper}
+                >
+                  <TextInput
+                    style={styles.input}
+                    value={input}
+                    onChangeText={setInput}
+                    placeholder="Ask me anything about health..."
+                    placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                    multiline={false}
+                    returnKeyType="send"
+                    onSubmitEditing={handleSend}
+                  />
+                  <TouchableOpacity
+                    style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
+                    onPress={handleSend}
+                    disabled={!input.trim() || isLoading}
+                  >
+                    <LinearGradient
+                      colors={input.trim() ? ['#4C6EF5', '#3D5AFE'] : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.1)']}
+                      style={styles.sendButtonGradient}
+                    >
+                      <Ionicons
+                        name="send"
+                        size={20}
+                        color={input.trim() ? '#fff' : '#6B7280'}
+                      />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </MotiView>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
+        </LinearGradient>
       </View>
     </View>
   );
@@ -200,16 +283,50 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0B1120',
   },
-  content: {
+  mainContent: {
     flex: 1,
-    marginTop: Platform.OS === 'ios' ? 50 : 20,
+  },
+  gradient: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  newChatButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  newChatGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  newChatText: {
+    color: '#fff',
+    marginLeft: 8,
+    fontWeight: '600',
+  },
+  chatContainer: {
+    flex: 1,
+    position: 'relative',
   },
   messagesContainer: {
     flex: 1,
   },
   messagesContent: {
     padding: 16,
-    paddingBottom: 16,
   },
   messageWrapper: {
     flexDirection: 'row',
@@ -226,29 +343,31 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#4C6EF5',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
   },
   messageContent: {
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 12,
     flex: 1,
   },
   userMessageContent: {
     backgroundColor: '#4C6EF5',
+    borderBottomRightRadius: 4,
   },
   assistantMessageContent: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomLeftRadius: 4,
   },
   loadingContent: {
     padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
   },
   messageText: {
     fontSize: 16,
     lineHeight: 22,
-    color: '#fff',
   },
   userMessageText: {
     color: '#fff',
@@ -256,12 +375,21 @@ const styles = StyleSheet.create({
   assistantMessageText: {
     color: 'rgba(255, 255, 255, 0.9)',
   },
-  inputContainer: {
-    padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
+  bottomContainer: {
+    position: 'absolute',
+    bottom: 80,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
+    backgroundColor: 'rgba(11, 17, 32, 0.95)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
-    backgroundColor: '#0B1120',
+  },
+  keyboardAvoidingView: {
+    width: '100%',
+  },
+  inputContainer: {
+    padding: 16,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -269,6 +397,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 25,
     paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   input: {
     flex: 1,
@@ -281,12 +411,15 @@ const styles = StyleSheet.create({
   sendButton: {
     width: 40,
     height: 40,
+  },
+  sendButtonGradient: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    backgroundColor: '#4C6EF5',
     alignItems: 'center',
     justifyContent: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    opacity: 0.5,
   },
 });
