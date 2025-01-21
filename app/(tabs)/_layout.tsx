@@ -57,15 +57,17 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? "home" : "home-outline"}
-              size={24}
-              color={color}
-              style={{
-                transform: [{ scale: focused ? 1.1 : 1 }],
-              }}
-            />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="home-outline" size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="nutritionanalyzer"
+        options={{
+          title: 'Nutrition',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="nutrition-outline" size={24} color={color} />
           ),
         }}
       />
@@ -73,15 +75,8 @@ export default function TabLayout() {
         name="aiassistant"
         options={{
           title: 'Assistant',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? "chatbubble" : "chatbubble-outline"}
-              size={24}
-              color={color}
-              style={{
-                transform: [{ scale: focused ? 1.1 : 1 }],
-              }}
-            />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="chatbubble-ellipses-outline" size={24} color={color} />
           ),
         }}
       />
@@ -89,15 +84,8 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? "person" : "person-outline"}
-              size={24}
-              color={color}
-              style={{
-                transform: [{ scale: focused ? 1.1 : 1 }],
-              }}
-            />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="person-outline" size={24} color={color} />
           ),
         }}
       />
