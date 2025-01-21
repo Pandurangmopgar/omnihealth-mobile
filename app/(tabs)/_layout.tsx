@@ -1,66 +1,69 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
-import { Platform, View } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { Platform } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
-
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
   const { isSignedIn } = useAuth();
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colorScheme === 'dark' ? 'rgba(18, 18, 18, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+          backgroundColor: '#0B1120',
+          height: Platform.OS === 'ios' ? 85 : 65,
           borderTopWidth: 0,
           elevation: 0,
-          height: Platform.OS === 'ios' ? 85 : 65,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 0,
         },
+        tabBarActiveTintColor: '#4C6EF5',
+        tabBarInactiveTintColor: '#6B7280',
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '600',
-          marginTop: -4,
+          fontWeight: '500',
         },
-        tabBarIconStyle: {
-          marginTop: 4,
-        },
-      }}>
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol 
-              size={24} 
-              name={focused ? "house.fill" : "house"} 
-              color={color} 
+            <Ionicons 
+              name={focused ? "home" : "home-outline"}
+              size={24}
+              color={color}
             />
           ),
         }}
       />
-      {isSignedIn && (
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Profile',
-            tabBarIcon: ({ color, focused }) => (
-              <IconSymbol 
-                size={24} 
-                name={focused ? "person.fill" : "person"} 
-                color={color} 
-              />
-            ),
-          }}
-        />
-      )}
+      <Tabs.Screen
+        name="aiassistant"
+        options={{
+          title: 'Assistant',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? "chatbubble" : "chatbubble-outline"}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? "person" : "person-outline"}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

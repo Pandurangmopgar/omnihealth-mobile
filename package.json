@@ -13,8 +13,9 @@
     "preset": "jest-expo"
   },
   "dependencies": {
-    "@clerk/clerk-expo": "^2.6.12",
+    "@clerk/clerk-expo": "^2.6.15",
     "@expo/vector-icons": "^14.0.2",
+    "@google/generative-ai": "^0.21.0",
     "@react-navigation/bottom-tabs": "^6.5.11",
     "@react-navigation/elements": "^1.3.21",
     "@react-navigation/native": "^6.0.2",
