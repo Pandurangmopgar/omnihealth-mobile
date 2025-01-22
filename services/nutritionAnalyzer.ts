@@ -60,7 +60,52 @@ Return analysis in this exact JSON structure:
   "meal_type": "breakfast" | "lunch" | "dinner" | "snack"
 }`;
 
-const formatAIResponse = (responseText: string) => {
+interface NutritionAnalysis {
+  analysis_type: 'text' | 'image';
+  basic_info: {
+    food_name: string;
+    portion_size: string;
+    preparation_method: string;
+    total_servings: number;
+  };
+  nutritional_content: {
+    calories: number;
+    macronutrients: {
+      protein: { amount: number; unit: 'g'; daily_value_percentage: number };
+      carbs: { amount: number; unit: 'g'; daily_value_percentage: number };
+      fats: { amount: number; unit: 'g'; daily_value_percentage: number };
+    };
+  };
+  health_analysis: {
+    benefits: string[];
+    considerations: string[];
+    allergens: string[];
+    processing_level: string;
+  };
+  recommendations: {
+    serving_suggestions: string[];
+    healthier_alternatives: string[];
+    local_options: string[];
+  };
+  source_reliability: 'verified' | 'estimated';
+  meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+}
+
+class NutritionAnalysisError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NutritionAnalysisError';
+  }
+}
+
+function handleError(error: unknown): never {
+  if (error instanceof Error) {
+    throw new NutritionAnalysisError(error.message);
+  }
+  throw new NutritionAnalysisError('An unknown error occurred');
+}
+
+function formatAIResponse(responseText: string): NutritionAnalysis {
   try {
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
@@ -68,39 +113,11 @@ const formatAIResponse = (responseText: string) => {
     }
     return JSON.parse(jsonMatch[0]);
   } catch (error) {
-    console.error('Error parsing AI response:', error);
-    throw new Error(`Failed to parse AI response: ${error.message}`);
+    throw new NutritionAnalysisError(error instanceof Error ? error.message : 'Failed to parse AI response');
   }
-};
+}
 
-export const getDailyGoals = async (userId: string) => {
-  try {
-    const { data, error } = await supabase
-      .from('nutrition_goals')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error;
-
-    return data || {
-      daily_calories: 2000,
-      daily_protein: 50,
-      daily_carbs: 275,
-      daily_fat: 55
-    };
-  } catch (error) {
-    console.error('Error fetching goals:', error);
-    return {
-      daily_calories: 2000,
-      daily_protein: 50,
-      daily_carbs: 275,
-      daily_fat: 55
-    };
-  }
-};
-
-const updateDailyProgress = async (userId: string, nutritionalContent: any) => {
+const updateDailyProgress = async (userId: string, nutritionalContent: NutritionAnalysis['nutritional_content']): Promise<{ calories: number; protein: number; carbs: number; fat: number; meals_logged: number }> => {
   const today = new Date().toISOString().split('T')[0];
   const cacheKey = `progress:${userId}:${today}`;
 
@@ -169,16 +186,16 @@ const updateDailyProgress = async (userId: string, nutritionalContent: any) => {
     return newProgress;
   } catch (error) {
     console.error('Error updating progress:', error);
-    throw new Error(`Failed to update progress: ${error.message}`);
+    throw new NutritionAnalysisError(error instanceof Error ? error.message : 'Failed to update progress');
   }
 };
 
-const storeAnalysisResult = async (userId: string, analysis: any) => {
+async function storeAnalysisResult(userId: string, analysis: NutritionAnalysis): Promise<void> {
   try {
     // Ensure meal_type is one of the allowed values
-    const validMealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
-    const mealType = validMealTypes.includes(analysis.meal_type?.toLowerCase())
-      ? analysis.meal_type.toLowerCase()
+    const validMealTypes = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
+    const mealType = validMealTypes.includes(analysis.meal_type as typeof validMealTypes[number])
+      ? analysis.meal_type
       : 'snack'; // Default to snack if invalid or missing
 
     const { error } = await supabase
@@ -198,39 +215,25 @@ const storeAnalysisResult = async (userId: string, analysis: any) => {
 
     if (error) throw error;
   } catch (error) {
-    console.error('Error storing analysis result:', error);
-    throw error;
+    throw new NutritionAnalysisError(error instanceof Error ? error.message : 'Failed to store analysis result');
   }
 };
 
-export const analyzeNutrition = async (
+async function analyzeNutrition(
   type: 'text' | 'image',
   content: string,
   userId: string
-) => {
+): Promise<{ analysis: NutritionAnalysis; progress: { calories: number; protein: number; carbs: number; fat: number; meals_logged: number } }> {
   try {
     if (!userId) {
       throw new Error('User ID is required');
     }
 
     let prompt = '';
-    let parts = [];
-
     if (type === 'text') {
-      prompt = `Analyze this food description: ${content}`;
-      parts = [{ text: systemPrompt }, { text: prompt }];
+      prompt = `Analyze the nutritional content of: ${content}`;
     } else {
-      prompt = 'Analyze this food image and provide nutritional information.';
-      parts = [
-        { text: systemPrompt },
-        { text: prompt },
-        {
-          inlineData: {
-            mimeType: 'image/jpeg',
-            data: content
-          }
-        }
-      ];
+      prompt = `Analyze the nutritional content of this food image: ${content}`;
     }
 
     // Check cache first
@@ -247,7 +250,7 @@ export const analyzeNutrition = async (
     }
 
     // Generate content
-    const result = await model.generateContent(parts);
+    const result = await model.generateContent([{ text: systemPrompt }, { text: prompt }]);
     const response = await result.response;
     const analysis = formatAIResponse(response.text());
 
@@ -264,65 +267,103 @@ export const analyzeNutrition = async (
 
     return { analysis, progress };
   } catch (error) {
-    console.error('Error in nutrition analysis:', error);
-    throw new Error(`Nutrition analysis failed: ${error.message}`);
+    throw new NutritionAnalysisError(error instanceof Error ? error.message : 'Failed to analyze nutrition');
   }
 };
 
-export const getDailyProgress = async (userId: string) => {
-  const today = new Date().toISOString().split('T')[0];
-  const cacheKey = `progress:${userId}:${today}`;
-
+async function getDailyProgress(userId: string): Promise<{ progress: { calories: number; protein: number; carbs: number; fat: number; meals_logged: number; }, goals: { daily_calories: number; daily_protein: number; daily_carbs: number; daily_fat: number } }> {
   try {
-    // Try Redis first
+    const date = new Date().toISOString().split('T')[0];
+    const cacheKey = `daily_progress:${userId}:${date}`;
+    
+    // Try to get from cache first
     const cachedProgress = await redis.get(cacheKey);
     if (cachedProgress) {
-      const progress = JSON.parse(cachedProgress);
-      const goals = await getDailyGoals(userId);
-      return {
-        ...progress,
-        goals,
-        progress: {
-          calories: (progress.calories / goals.daily_calories) * 100,
-          protein: (progress.protein / goals.daily_protein) * 100,
-          carbs: (progress.carbs / goals.daily_carbs) * 100,
-          fat: (progress.fat / goals.daily_fat) * 100
-        }
-      };
+      return JSON.parse(cachedProgress);
     }
 
-    // Fallback to Supabase
-    const { data, error } = await supabase
+    // Get from database if not in cache
+    const { data: progressData, error: dbError } = await supabase
       .from('progress_tracking')
       .select('*')
       .eq('user_id', userId)
-      .eq('date', today)
+      .eq('date', date)
       .single();
 
-    if (error && error.code !== 'PGRST116') throw error;
+    if (dbError) throw dbError;
 
-    const progress = data || {
-      calories: 0,
-      protein: 0,
-      carbs: 0,
-      fat: 0,
-      meals_logged: 0
-    };
-
+    // Get user's goals
     const goals = await getDailyGoals(userId);
 
-    return {
-      ...progress,
-      goals,
-      progress: {
-        calories: (progress.calories / goals.daily_calories) * 100,
-        protein: (progress.protein / goals.daily_protein) * 100,
-        carbs: (progress.carbs / goals.daily_carbs) * 100,
-        fat: (progress.fat / goals.daily_fat) * 100
-      }
+    // Initialize default progress
+    const progress = {
+      calories: progressData?.total_calories || 0,
+      protein: progressData?.total_protein || 0,
+      carbs: progressData?.total_carbs || 0,
+      fat: progressData?.total_fat || 0,
+      meals_logged: progressData?.meals_logged || 0,
     };
+
+    const result = {
+      progress,
+      goals,
+    };
+
+    // Cache the result
+    await redis.set(cacheKey, JSON.stringify(result), { ex: CACHE_TTL });
+
+    return result;
   } catch (error) {
-    console.error('Error fetching progress:', error);
-    throw new Error(`Failed to fetch progress: ${error.message}`);
+    console.error('Error in getDailyProgress:', error);
+    // Return default values if there's an error
+    return {
+      progress: {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        meals_logged: 0,
+      },
+      goals: {
+        daily_calories: 2000,
+        daily_protein: 50,
+        daily_carbs: 275,
+        daily_fat: 55,
+      },
+    };
   }
 };
+
+async function getDailyGoals(userId: string): Promise<{ daily_calories: number; daily_protein: number; daily_carbs: number; daily_fat: number }> {
+  try {
+    // Get the most recent goals entry for the user
+    const { data, error } = await supabase
+      .from('nutrition_goals')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) throw error;
+
+    // Map the column names from the table to our expected format
+    return {
+      daily_calories: data?.calories || 2000,
+      daily_protein: data?.protein || 50,
+      daily_carbs: data?.carbs || 225,
+      daily_fat: data?.fat_target || 65
+    };
+  } catch (error) {
+    console.error('Error fetching nutrition goals:', error);
+    // Return default values based on the table's typical values
+    return {
+      daily_calories: 2000, // Default calorie goal
+      daily_protein: 50,    // Default protein goal
+      daily_carbs: 225,     // Default carbs goal
+      daily_fat: 65         // Default fat goal
+    };
+  }
+};
+
+export { analyzeNutrition, getDailyProgress, getDailyGoals };
