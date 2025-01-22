@@ -51,11 +51,10 @@ interface NutritionResult {
     total_servings: number;
   };
   nutritional_content: {
-    calories: number;
     macronutrients: {
-      protein: { amount: number; unit: string; daily_value_percentage: number };
-      carbs: { amount: number; unit: string; daily_value_percentage: number };
-      fats: { amount: number; unit: string; daily_value_percentage: number };
+      protein: { amount: number; unit: 'g'; daily_value_percentage: number };
+      carbs: { amount: number; unit: 'g'; daily_value_percentage: number };
+      fats: { amount: number; unit: 'g'; daily_value_percentage: number };
     };
   };
   health_analysis: {
@@ -70,16 +69,16 @@ interface NutritionResult {
     local_options: string[];
   };
   source_reliability: 'verified' | 'estimated';
-  meal_type: string;
+  meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
 }
 
-interface DailyProgress {
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  meals_logged: number;
-}
+// interface DailyProgress {
+//   calories: number;
+//   protein: number;
+//   carbs: number;
+//   fat: number;
+//   meals_logged: number;
+// }
 
 interface NutritionVisualizationProps {
   result?: NutritionResult | null;
@@ -324,7 +323,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
   }, [userId]);
 
   const nutritionData = result ? {
-    calories: result.nutritional_content.calories,
+    calories: result.nutritional_content.macronutrients.protein.amount * 4 + result.nutritional_content.macronutrients.carbs.amount * 4 + result.nutritional_content.macronutrients.fats.amount * 9,
     protein: result.nutritional_content.macronutrients.protein.amount,
     carbs: result.nutritional_content.macronutrients.carbs.amount,
     fats: result.nutritional_content.macronutrients.fats.amount,
@@ -898,10 +897,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   chartContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chartTitle: {
     fontSize: 18,
@@ -1001,9 +998,11 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
   },
   progressValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 4,
   },
   macroDistribution: {
     height: 400,
@@ -1012,10 +1011,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     padding: 16,
-  },
-  chartContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   macroLegend: {
     flexDirection: 'row',
@@ -1087,14 +1082,23 @@ const styles = StyleSheet.create({
   },
   nutrientDetails: {
     marginTop: 16,
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    padding: 16,
   },
   nutrientGrid: {
     marginTop: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   nutrientItem: {
+    width: '48%',
     marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   nutrientLabel: {
     color: 'white',
@@ -1157,6 +1161,14 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
 });
+
+type DailyProgress = {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  meals_logged: number;
+};
 
 export default function NutritionAnalyzer() {
   const insets = useSafeAreaInsets();
