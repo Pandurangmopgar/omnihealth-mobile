@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { MotiView } from 'moti';
 import { useAuth } from '@clerk/clerk-expo';
-import { analyzeNutrition, getDailyProgress } from '../../services/nutritionAnalyzer';
+import { analyzeNutrition, getDailyProgress, getDailyGoals } from '../../services/nutritionAnalyzer';
 import { PieChart, LineChart } from 'react-native-chart-kit';
 import Svg, { Circle } from 'react-native-svg';
 import { useRouter } from 'expo-router';
@@ -294,6 +294,29 @@ const MacroCard = ({ title, current, target, unit, icon, colors }: {
 };
 
 const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizationProps) => {
+  const [goals, setGoals] = useState<{
+    daily_calories: number;
+    daily_protein: number;
+    daily_carbs: number;
+    daily_fat: number;
+  } | null>(null);
+
+  const { userId } = useAuth();
+
+  useEffect(() => {
+    const fetchGoals = async () => {
+      if (userId) {
+        try {
+          const userGoals = await getDailyGoals(userId);
+          setGoals(userGoals);
+        } catch (error) {
+          console.error('Error fetching goals:', error);
+        }
+      }
+    };
+    fetchGoals();
+  }, [userId]);
+
   const nutritionData = result ? {
     calories: result.nutritional_content.calories,
     protein: result.nutritional_content.macronutrients.protein.amount,
@@ -306,17 +329,19 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
     fats: dailyProgress.fat,
   };
 
-  const macroPercentages = [
-    { x: 'Protein', y: nutritionData.protein * 4 },
-    { x: 'Carbs', y: nutritionData.carbs * 4 },
-    { x: 'Fats', y: nutritionData.fats * 9 },
-  ];
+  // Calculate macro percentages based on caloric values
+  const macroCalories = {
+    protein: nutritionData.protein * 4,
+    carbs: nutritionData.carbs * 4,
+    fats: nutritionData.fats * 9,
+  };
 
-  const totalCalories = macroPercentages.reduce((acc, curr) => acc + curr.y, 0);
-  const macroData = macroPercentages.map(item => ({
-    ...item,
-    y: (item.y / totalCalories) * 100,
-  }));
+  const totalCalories = Object.values(macroCalories).reduce((acc, curr) => acc + curr, 0);
+  const macroPercentages = {
+    protein: (macroCalories.protein / totalCalories) * 100 || 0,
+    carbs: (macroCalories.carbs / totalCalories) * 100 || 0,
+    fats: (macroCalories.fats / totalCalories) * 100 || 0,
+  };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -337,10 +362,15 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                 colors={COLORS.calories}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={[styles.progressBar, { width: `${(nutritionData.calories / 2000) * 100}%` }]}
+                style={[
+                  styles.progressBar,
+                  { width: `${(nutritionData.calories / (goals?.daily_calories || 2000)) * 100}%` }
+                ]}
               />
             </View>
-            <Text style={styles.caloriesTarget}>Daily Target: 2000 kcal</Text>
+            <Text style={styles.caloriesTarget}>
+              Daily Target: {goals?.daily_calories || 2000} kcal
+            </Text>
           </LinearGradient>
         </BlurView>
       </Animated.View>
@@ -355,7 +385,11 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
             <Text style={styles.sectionTitle}>Macro Distribution</Text>
             <View style={styles.chartContainer}>
               <VictoryPie
-                data={macroData}
+                data={[
+                  { x: 'Protein', y: macroPercentages.protein },
+                  { x: 'Carbs', y: macroPercentages.carbs },
+                  { x: 'Fats', y: macroPercentages.fats },
+                ]}
                 width={250}
                 height={250}
                 colorScale={[COLORS.protein[0], COLORS.carbs[0], COLORS.fats[0]]}
@@ -373,10 +407,17 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                 }}
               />
               <View style={styles.macroLegend}>
-                {macroData.map((item, index) => (
-                  <View key={item.x} style={styles.legendItem}>
+                {Object.entries(macroPercentages).map(([macro, percentage], index) => (
+                  <View key={macro} style={styles.legendItem}>
                     <View style={[styles.legendColor, { backgroundColor: [COLORS.protein[0], COLORS.carbs[0], COLORS.fats[0]][index] }]} />
-                    <Text style={styles.legendText}>{item.x}: {Math.round(item.y)}%</Text>
+                    <View style={styles.legendTextContainer}>
+                      <Text style={styles.legendText}>
+                        {macro.charAt(0).toUpperCase() + macro.slice(1)}: {Math.round(percentage)}%
+                      </Text>
+                      <Text style={styles.legendSubtext}>
+                        {nutritionData[macro as keyof typeof nutritionData]}g / {goals?.[`daily_${macro}` as keyof typeof goals]}g
+                      </Text>
+                    </View>
                   </View>
                 ))}
               </View>
@@ -385,33 +426,43 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
         </BlurView>
       </Animated.View>
 
-      {/* Macro Tracking Cards */}
-      <View style={styles.macroCards}>
-        <MacroCard
-          title="Protein"
-          current={nutritionData.protein}
-          target={50}
-          unit="g"
-          icon="barbell-outline"
-          colors={COLORS.protein}
-        />
-        <MacroCard
-          title="Carbs"
-          current={nutritionData.carbs}
-          target={225}
-          unit="g"
-          icon="leaf-outline"
-          colors={COLORS.carbs}
-        />
-        <MacroCard
-          title="Fats"
-          current={nutritionData.fats}
-          target={65}
-          unit="g"
-          icon="water-outline"
-          colors={COLORS.fats}
-        />
-      </View>
+      {/* Nutrient Details */}
+      <Animated.View entering={FadeInDown.delay(200)} style={styles.nutrientDetails}>
+        <BlurView intensity={20} style={styles.cardBlur}>
+          <LinearGradient
+            colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+            style={styles.cardGradient}
+          >
+            <Text style={styles.sectionTitle}>Nutrient Details</Text>
+            <View style={styles.nutrientGrid}>
+              {Object.entries(nutritionData).map(([nutrient, amount]) => (
+                <View key={nutrient} style={styles.nutrientItem}>
+                  <Text style={styles.nutrientLabel}>
+                    {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
+                  </Text>
+                  <Text style={styles.nutrientValue}>{amount}g</Text>
+                  <View style={styles.nutrientProgress}>
+                    <LinearGradient
+                      colors={COLORS[nutrient as keyof typeof COLORS]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={[
+                        styles.nutrientProgressBar,
+                        {
+                          width: `${(amount / (goals?.[`daily_${nutrient}` as keyof typeof goals] || 1)) * 100}%`
+                        }
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.nutrientTarget}>
+                    Target: {goals?.[`daily_${nutrient}` as keyof typeof goals]}g
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </LinearGradient>
+        </BlurView>
+      </Animated.View>
 
       {/* Weekly Progress */}
       <Animated.View entering={FadeInUp.delay(250)} style={styles.weeklyProgress}>
@@ -424,6 +475,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
             <VictoryChart
               height={200}
               padding={{ top: 20, bottom: 40, left: 40, right: 20 }}
+              domainPadding={{ x: 20 }}
             >
               <VictoryAxis
                 tickFormat={(t) => `Day ${t}`}
@@ -448,7 +500,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                   { x: 4, y: 95 },
                   { x: 5, y: 88 },
                   { x: 6, y: 92 },
-                  { x: 7, y: (nutritionData.calories / 2000) * 100 },
+                  { x: 7, y: (nutritionData.calories / (goals?.daily_calories || 2000)) * 100 },
                 ]}
                 style={{
                   data: {
@@ -471,327 +523,6 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
     </ScrollView>
   );
 };
-
-export default function NutritionAnalyzer() {
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const { userId } = useAuth();
-  const [image, setImage] = useState<string | null>(null);
-  const [textInput, setTextInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<NutritionResult | null>(null);
-  const [showDashboard, setShowDashboard] = useState(false);
-  const [dailyProgress, setDailyProgress] = useState<DailyProgress>({
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fat: 0,
-    meals_logged: 0,
-  });
-
-  // Fetch daily progress when dashboard is opened
-  useEffect(() => {
-    if (showDashboard && userId) {
-      const fetchDailyProgress = async () => {
-        try {
-          const progressData = await getDailyProgress(userId);
-          // Extract just the progress part of the response
-          setDailyProgress({
-            calories: progressData.progress.calories || 0,
-            protein: progressData.progress.protein || 0,
-            carbs: progressData.progress.carbs || 0,
-            fat: progressData.progress.fat || 0,
-            meals_logged: progressData.progress.meals_logged || 0,
-          });
-        } catch (error) {
-          console.error('Error fetching daily progress:', error);
-          // Set default values if there's an error
-          setDailyProgress({
-            calories: 0,
-            protein: 0,
-            carbs: 0,
-            fat: 0,
-            meals_logged: 0,
-          });
-        }
-      };
-      fetchDailyProgress();
-    }
-  }, [showDashboard, userId]);
-
-  const resetAnalysis = () => {
-    setImage(null);
-    setTextInput('');
-    setResult(null);
-  };
-
-  const handleTextSubmit = async () => {
-    if (!textInput.trim() || isLoading || !userId) return;
-
-    try {
-      setIsLoading(true);
-      router.push('/(tabs)/nutritionanalyzer');
-      const { analysis } = await analyzeNutrition('text', textInput, userId);
-      setResult(analysis);
-    } catch (error) {
-      console.error('Error analyzing nutrition:', error);
-      Alert.alert('Error', 'Failed to analyze nutrition. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleImageAnalysis = async (imageUri: string) => {
-    if (!userId) {
-      Alert.alert('Error', 'Please sign in to analyze food.');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      router.push('/(tabs)/nutritionanalyzer');
-      const { analysis } = await analyzeNutrition('image', imageUri, userId);
-      setResult(analysis);
-    } catch (error) {
-      console.error('Error analyzing image:', error);
-      Alert.alert('Error', 'Failed to analyze image. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'We need camera roll permissions to analyze food images.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-      base64: true,
-    });
-
-    if (!result.canceled && result.assets[0].base64) {
-      setImage(result.assets[0].uri);
-      setTextInput('');
-      handleImageAnalysis(result.assets[0].base64);
-    }
-  };
-
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'We need camera permissions to take food photos.');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-      base64: true,
-    });
-
-    if (!result.canceled && result.assets[0].base64) {
-      setImage(result.assets[0].uri);
-      setTextInput('');
-      handleImageAnalysis(result.assets[0].base64);
-    }
-  };
-
-  return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      <LinearGradient
-        colors={['#0B1120', '#1A237E']}
-        style={[styles.gradient, { paddingTop: insets.top }]}
-      >
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Nutrition Analyzer</Text>
-            <TouchableOpacity
-              style={styles.dashboardButton}
-              onPress={() => setShowDashboard(!showDashboard)}
-            >
-              <Ionicons 
-                name={showDashboard ? "stats-chart" : "stats-chart-outline"} 
-                size={24} 
-                color="#fff" 
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <ScrollView 
-          style={styles.content}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {showDashboard ? (
-            <NutritionVisualization result={result} dailyProgress={dailyProgress} />
-          ) : (
-            <>
-              <View style={styles.inputSection}>
-                <View style={styles.imageInputs}>
-                  <TouchableOpacity
-                    style={styles.imageButton}
-                    onPress={takePhoto}
-                  >
-                    <LinearGradient
-                      colors={['#4C6EF5', '#3D5AFE']}
-                      style={styles.buttonGradient}
-                    >
-                      <Ionicons name="camera-outline" size={24} color="#fff" />
-                      <Text style={styles.buttonText}>Take Photo</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.imageButton}
-                    onPress={pickImage}
-                  >
-                    <LinearGradient
-                      colors={['#4C6EF5', '#3D5AFE']}
-                      style={styles.buttonGradient}
-                    >
-                      <Ionicons name="images-outline" size={24} color="#fff" />
-                      <Text style={styles.buttonText}>Pick Image</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-
-                <Text style={styles.orText}>OR</Text>
-
-                <View style={styles.textInputContainer}>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Describe your food..."
-                    placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                    value={textInput}
-                    onChangeText={setTextInput}
-                    multiline
-                    returnKeyType="done"
-                    onSubmitEditing={handleTextSubmit}
-                  />
-                  <TouchableOpacity
-                    style={[styles.submitButton, !textInput.trim() && styles.submitButtonDisabled]}
-                    onPress={handleTextSubmit}
-                    disabled={!textInput.trim() || isLoading}
-                  >
-                    <LinearGradient
-                      colors={textInput.trim() ? ['#4C6EF5', '#3D5AFE'] : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.1)']}
-                      style={styles.submitButtonGradient}
-                    >
-                      <Ionicons
-                        name="arrow-forward-outline"
-                        size={24}
-                        color={textInput.trim() ? '#fff' : '#6B7280'}
-                      />
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {image && (
-                <MotiView
-                  from={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ type: 'timing', duration: 300 }}
-                  style={styles.imagePreview}
-                >
-                  <Image source={{ uri: image }} style={styles.previewImage} />
-                </MotiView>
-              )}
-
-              {isLoading && (
-                <MotiView
-                  from={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ type: 'timing', duration: 300 }}
-                  style={styles.loadingContainer}
-                >
-                  <ActivityIndicator size="large" color="#4C6EF5" />
-                  <Text style={styles.loadingText}>Analyzing nutrition...</Text>
-                </MotiView>
-              )}
-
-              {result && !showDashboard && (
-                <MotiView
-                  from={{ opacity: 0, translateY: 20 }}
-                  animate={{ opacity: 1, translateY: 0 }}
-                  transition={{ type: 'timing', duration: 300 }}
-                  style={styles.resultContainer}
-                >
-                  <View style={styles.resultHeader}>
-                    <View style={styles.resultTitleRow}>
-                      <Text style={styles.foodName}>{result.basic_info.food_name}</Text>
-                      <TouchableOpacity
-                        style={styles.closeButton}
-                        onPress={resetAnalysis}
-                      >
-                        <Ionicons name="close-circle" size={24} color="rgba(255, 255, 255, 0.7)" />
-                      </TouchableOpacity>
-                    </View>
-                    <Text style={styles.mealType}>
-                      <Ionicons name="time-outline" size={16} color="#4C6EF5" /> {result.meal_type}
-                    </Text>
-                    {result.basic_info.portion_size && (
-                      <Text style={styles.portionSize}>
-                        <Ionicons name="restaurant-outline" size={16} color="rgba(255, 255, 255, 0.7)" /> {result.basic_info.portion_size}
-                      </Text>
-                    )}
-                  </View>
-
-                  {result.health_analysis && (
-                    <View style={styles.healthAnalysis}>
-                      <Text style={styles.sectionTitle}>
-                        <Ionicons name="medical-outline" size={20} color="#fff" /> Health Analysis
-                      </Text>
-                      {result.health_analysis.benefits.length > 0 && (
-                        <View style={styles.benefitsContainer}>
-                          <Text style={styles.benefitsTitle}>
-                            <Ionicons name="checkmark-circle-outline" size={18} color="#4C6EF5" /> Benefits
-                          </Text>
-                          {result.health_analysis.benefits.map((benefit, index) => (
-                            <Text key={index} style={styles.benefitItem}>• {benefit}</Text>
-                          ))}
-                        </View>
-                      )}
-                      {result.health_analysis.considerations.length > 0 && (
-                        <View style={styles.considerationsContainer}>
-                          <Text style={styles.considerationsTitle}>
-                            <Ionicons name="information-circle-outline" size={18} color="#4C6EF5" /> Considerations
-                          </Text>
-                          {result.health_analysis.considerations.map((consideration, index) => (
-                            <Text key={index} style={styles.considerationItem}>• {consideration}</Text>
-                          ))}
-                        </View>
-                      )}
-                      {result.health_analysis.allergens.length > 0 && (
-                        <View style={styles.allergensContainer}>
-                          <Text style={styles.allergensTitle}>
-                            <Ionicons name="alert-circle-outline" size={18} color="#4C6EF5" /> Allergens
-                          </Text>
-                          {result.health_analysis.allergens.map((allergen, index) => (
-                            <Text key={index} style={styles.allergenItem}>• {allergen}</Text>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                  )}
-                </MotiView>
-              )}
-            </>
-          )}
-        </ScrollView>
-      </LinearGradient>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {
@@ -1307,4 +1038,369 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 16,
   },
+  nutrientDetails: {
+    marginTop: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  nutrientGrid: {
+    marginTop: 12,
+  },
+  nutrientItem: {
+    marginBottom: 16,
+  },
+  nutrientLabel: {
+    color: 'white',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  nutrientValue: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  nutrientProgress: {
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 2,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+  nutrientProgressBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  nutrientTarget: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  legendTextContainer: {
+    flex: 1,
+  },
+  legendSubtext: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+  },
 });
+
+export default function NutritionAnalyzer() {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { userId } = useAuth();
+  const [image, setImage] = useState<string | null>(null);
+  const [textInput, setTextInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState<NutritionResult | null>(null);
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [dailyProgress, setDailyProgress] = useState<DailyProgress>({
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    meals_logged: 0,
+  });
+
+  // Fetch daily progress when dashboard is opened
+  useEffect(() => {
+    if (showDashboard && userId) {
+      const fetchDailyProgress = async () => {
+        try {
+          const progressData = await getDailyProgress(userId);
+          // Extract just the progress part of the response
+          setDailyProgress({
+            calories: progressData.progress.calories || 0,
+            protein: progressData.progress.protein || 0,
+            carbs: progressData.progress.carbs || 0,
+            fat: progressData.progress.fat || 0,
+            meals_logged: progressData.progress.meals_logged || 0,
+          });
+        } catch (error) {
+          console.error('Error fetching daily progress:', error);
+          // Set default values if there's an error
+          setDailyProgress({
+            calories: 0,
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+            meals_logged: 0,
+          });
+        }
+      };
+      fetchDailyProgress();
+    }
+  }, [showDashboard, userId]);
+
+  const resetAnalysis = () => {
+    setImage(null);
+    setTextInput('');
+    setResult(null);
+  };
+
+  const handleTextSubmit = async () => {
+    if (!textInput.trim() || isLoading || !userId) return;
+
+    try {
+      setIsLoading(true);
+      router.push('/(tabs)/nutritionanalyzer');
+      const { analysis } = await analyzeNutrition('text', textInput, userId);
+      setResult(analysis);
+    } catch (error) {
+      console.error('Error analyzing nutrition:', error);
+      Alert.alert('Error', 'Failed to analyze nutrition. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleImageAnalysis = async (imageUri: string) => {
+    if (!userId) {
+      Alert.alert('Error', 'Please sign in to analyze food.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      router.push('/(tabs)/nutritionanalyzer');
+      const { analysis } = await analyzeNutrition('image', imageUri, userId);
+      setResult(analysis);
+    } catch (error) {
+      console.error('Error analyzing image:', error);
+      Alert.alert('Error', 'Failed to analyze image. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'We need camera roll permissions to analyze food images.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0].base64) {
+      setImage(result.assets[0].uri);
+      setTextInput('');
+      handleImageAnalysis(result.assets[0].base64);
+    }
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'We need camera permissions to take food photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0].base64) {
+      setImage(result.assets[0].uri);
+      setTextInput('');
+      handleImageAnalysis(result.assets[0].base64);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar style="light" />
+      <LinearGradient
+        colors={['#0B1120', '#1A237E']}
+        style={[styles.gradient, { paddingTop: insets.top }]}
+      >
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Nutrition Analyzer</Text>
+            <TouchableOpacity
+              style={styles.dashboardButton}
+              onPress={() => setShowDashboard(!showDashboard)}
+            >
+              <Ionicons 
+                name={showDashboard ? "stats-chart" : "stats-chart-outline"} 
+                size={24} 
+                color="#fff" 
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <ScrollView 
+          style={styles.content}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {showDashboard ? (
+            <NutritionVisualization result={result} dailyProgress={dailyProgress} />
+          ) : (
+            <>
+              <View style={styles.inputSection}>
+                <View style={styles.imageInputs}>
+                  <TouchableOpacity
+                    style={styles.imageButton}
+                    onPress={takePhoto}
+                  >
+                    <LinearGradient
+                      colors={['#4C6EF5', '#3D5AFE']}
+                      style={styles.buttonGradient}
+                    >
+                      <Ionicons name="camera-outline" size={24} color="#fff" />
+                      <Text style={styles.buttonText}>Take Photo</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.imageButton}
+                    onPress={pickImage}
+                  >
+                    <LinearGradient
+                      colors={['#4C6EF5', '#3D5AFE']}
+                      style={styles.buttonGradient}
+                    >
+                      <Ionicons name="images-outline" size={24} color="#fff" />
+                      <Text style={styles.buttonText}>Pick Image</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.orText}>OR</Text>
+
+                <View style={styles.textInputContainer}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Describe your food..."
+                    placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                    value={textInput}
+                    onChangeText={setTextInput}
+                    multiline
+                    returnKeyType="done"
+                    onSubmitEditing={handleTextSubmit}
+                  />
+                  <TouchableOpacity
+                    style={[styles.submitButton, !textInput.trim() && styles.submitButtonDisabled]}
+                    onPress={handleTextSubmit}
+                    disabled={!textInput.trim() || isLoading}
+                  >
+                    <LinearGradient
+                      colors={textInput.trim() ? ['#4C6EF5', '#3D5AFE'] : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.1)']}
+                      style={styles.submitButtonGradient}
+                    >
+                      <Ionicons
+                        name="arrow-forward-outline"
+                        size={24}
+                        color={textInput.trim() ? '#fff' : '#6B7280'}
+                      />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {image && (
+                <MotiView
+                  from={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: 'timing', duration: 300 }}
+                  style={styles.imagePreview}
+                >
+                  <Image source={{ uri: image }} style={styles.previewImage} />
+                </MotiView>
+              )}
+
+              {isLoading && (
+                <MotiView
+                  from={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: 'timing', duration: 300 }}
+                  style={styles.loadingContainer}
+                >
+                  <ActivityIndicator size="large" color="#4C6EF5" />
+                  <Text style={styles.loadingText}>Analyzing nutrition...</Text>
+                </MotiView>
+              )}
+
+              {result && !showDashboard && (
+                <MotiView
+                  from={{ opacity: 0, translateY: 20 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={{ type: 'timing', duration: 300 }}
+                  style={styles.resultContainer}
+                >
+                  <View style={styles.resultHeader}>
+                    <View style={styles.resultTitleRow}>
+                      <Text style={styles.foodName}>{result.basic_info.food_name}</Text>
+                      <TouchableOpacity
+                        style={styles.closeButton}
+                        onPress={resetAnalysis}
+                      >
+                        <Ionicons name="close-circle" size={24} color="rgba(255, 255, 255, 0.7)" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.mealType}>
+                      <Ionicons name="time-outline" size={16} color="#4C6EF5" /> {result.meal_type}
+                    </Text>
+                    {result.basic_info.portion_size && (
+                      <Text style={styles.portionSize}>
+                        <Ionicons name="restaurant-outline" size={16} color="rgba(255, 255, 255, 0.7)" /> {result.basic_info.portion_size}
+                      </Text>
+                    )}
+                  </View>
+
+                  {result.health_analysis && (
+                    <View style={styles.healthAnalysis}>
+                      <Text style={styles.sectionTitle}>
+                        <Ionicons name="medical-outline" size={20} color="#fff" /> Health Analysis
+                      </Text>
+                      {result.health_analysis.benefits.length > 0 && (
+                        <View style={styles.benefitsContainer}>
+                          <Text style={styles.benefitsTitle}>
+                            <Ionicons name="checkmark-circle-outline" size={18} color="#4C6EF5" /> Benefits
+                          </Text>
+                          {result.health_analysis.benefits.map((benefit, index) => (
+                            <Text key={index} style={styles.benefitItem}>• {benefit}</Text>
+                          ))}
+                        </View>
+                      )}
+                      {result.health_analysis.considerations.length > 0 && (
+                        <View style={styles.considerationsContainer}>
+                          <Text style={styles.considerationsTitle}>
+                            <Ionicons name="information-circle-outline" size={18} color="#4C6EF5" /> Considerations
+                          </Text>
+                          {result.health_analysis.considerations.map((consideration, index) => (
+                            <Text key={index} style={styles.considerationItem}>• {consideration}</Text>
+                          ))}
+                        </View>
+                      )}
+                      {result.health_analysis.allergens.length > 0 && (
+                        <View style={styles.allergensContainer}>
+                          <Text style={styles.allergensTitle}>
+                            <Ionicons name="alert-circle-outline" size={18} color="#4C6EF5" /> Allergens
+                          </Text>
+                          {result.health_analysis.allergens.map((allergen, index) => (
+                            <Text key={index} style={styles.allergenItem}>• {allergen}</Text>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </MotiView>
+              )}
+            </>
+          )}
+        </ScrollView>
+      </LinearGradient>
+    </View>
+  );
+}

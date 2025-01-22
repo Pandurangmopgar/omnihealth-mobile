@@ -273,97 +273,142 @@ async function analyzeNutrition(
 
 async function getDailyProgress(userId: string): Promise<{ progress: { calories: number; protein: number; carbs: number; fat: number; meals_logged: number; }, goals: { daily_calories: number; daily_protein: number; daily_carbs: number; daily_fat: number } }> {
   try {
-    const date = new Date().toISOString().split('T')[0];
-    const cacheKey = `daily_progress:${userId}:${date}`;
+    console.log('[Progress] Fetching progress for user:', userId);
+    const today = new Date().toISOString().split('T')[0];
     
-    // Try to get from cache first
-    const cachedProgress = await redis.get(cacheKey);
-    if (cachedProgress) {
-      return JSON.parse(cachedProgress);
-    }
-
-    // Get from database if not in cache
-    const { data: progressData, error: dbError } = await supabase
+    // Get today's progress from progress_tracking table
+    const { data: progressData, error: progressError } = await supabase
       .from('progress_tracking')
-      .select('*')
+      .select(`
+        total_calories,
+        total_protein,
+        total_carbs,
+        total_fat,
+        meals_logged,
+        date
+      `)
       .eq('user_id', userId)
-      .eq('date', date)
+      .eq('date', today)
       .single();
 
-    if (dbError) throw dbError;
+    if (progressError) {
+      console.error('[Progress] Error fetching progress:', progressError);
+      throw progressError;
+    }
+
+    console.log('[Progress] Retrieved progress data:', progressData);
 
     // Get user's goals
     const goals = await getDailyGoals(userId);
 
-    // Initialize default progress
-    const progress = {
-      calories: progressData?.total_calories || 0,
-      protein: progressData?.total_protein || 0,
-      carbs: progressData?.total_carbs || 0,
-      fat: progressData?.total_fat || 0,
-      meals_logged: progressData?.meals_logged || 0,
+    // If no progress data exists for today, return zeros
+    const progress = progressData ? {
+      calories: progressData.total_calories || 0,
+      protein: progressData.total_protein || 0,
+      carbs: progressData.total_carbs || 0,
+      fat: progressData.total_fat || 0,
+      meals_logged: progressData.meals_logged || 0
+    } : {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      meals_logged: 0
     };
 
-    const result = {
+    console.log('[Progress] Returning progress:', progress);
+    console.log('[Progress] Returning goals:', goals);
+
+    return {
       progress,
-      goals,
+      goals
     };
 
-    // Cache the result
-    await redis.set(cacheKey, JSON.stringify(result), { ex: CACHE_TTL });
-
-    return result;
   } catch (error) {
-    console.error('Error in getDailyProgress:', error);
-    // Return default values if there's an error
+    console.error('[Progress] Error in getDailyProgress:', error);
+    // Return zeros for progress and default goals if there's an error
     return {
       progress: {
         calories: 0,
         protein: 0,
         carbs: 0,
         fat: 0,
-        meals_logged: 0,
+        meals_logged: 0
       },
-      goals: {
-        daily_calories: 2000,
-        daily_protein: 50,
-        daily_carbs: 275,
-        daily_fat: 55,
-      },
+      goals: getDefaultGoals()
     };
   }
-};
+}
 
 async function getDailyGoals(userId: string): Promise<{ daily_calories: number; daily_protein: number; daily_carbs: number; daily_fat: number }> {
   try {
+    console.log(`[NutritionGoals] Fetching goals for user: ${userId}`);
+    
     // Get the most recent goals entry for the user
     const { data, error } = await supabase
       .from('nutrition_goals')
-      .select('*')
+      .select(`
+      
+        user_id,
+        calories_target,
+        protein_target,
+        carbs_target,
+        fat_target,
+        start_date,
+        end_date
+      `)
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
+      .order('start_date', { ascending: false })
       .limit(1)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[NutritionGoals] Error fetching from Supabase:', error);
+      throw error;
+    }
+
+    console.log('[NutritionGoals] Retrieved data:', data);
+
+    if (!data) {
+      console.warn('[NutritionGoals] No goals found for user, using defaults');
+      return getDefaultGoals();
+    }
+
+    // Check if the goals are still valid (within date range)
+    const now = new Date();
+    const startDate = data.start_date ? new Date(data.start_date) : null;
+    const endDate = data.end_date ? new Date(data.end_date) : null;
+
+    if (startDate && endDate && (now < startDate || now > endDate)) {
+      console.warn('[NutritionGoals] Goals are outside valid date range, using defaults');
+      return getDefaultGoals();
+    }
 
     // Map the column names from the table to our expected format
-    return {
-      daily_calories: data?.calories || 2000,
-      daily_protein: data?.protein || 50,
-      daily_carbs: data?.carbs || 225,
-      daily_fat: data?.fat_target || 65
+    const goals = {
+      daily_calories: data.calories_target || getDefaultGoals().daily_calories,
+      daily_protein: data.protein_target || getDefaultGoals().daily_protein,
+      daily_carbs: data.carbs_target || getDefaultGoals().daily_carbs,
+      daily_fat: data.fat_target || getDefaultGoals().daily_fat
     };
+
+    console.log('[NutritionGoals] Returning goals:', goals);
+    return goals;
   } catch (error) {
-    console.error('Error fetching nutrition goals:', error);
-    // Return default values based on the table's typical values
-    return {
-      daily_calories: 2000, // Default calorie goal
-      daily_protein: 50,    // Default protein goal
-      daily_carbs: 225,     // Default carbs goal
-      daily_fat: 65         // Default fat goal
-    };
+    console.error('[NutritionGoals] Error in getDailyGoals:', error);
+    return getDefaultGoals();
   }
 };
+
+function getDefaultGoals() {
+  const defaults = {
+    daily_calories: 2000,
+    daily_protein: 50,
+    daily_carbs: 225,
+    daily_fat: 65
+  };
+  console.log('[NutritionGoals] Using default goals:', defaults);
+  return defaults;
+}
 
 export { analyzeNutrition, getDailyProgress, getDailyGoals };
