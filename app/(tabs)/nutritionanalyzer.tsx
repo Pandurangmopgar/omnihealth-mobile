@@ -11,6 +11,9 @@ import { analyzeNutrition, getDailyProgress } from '../../services/nutritionAnal
 import { PieChart, LineChart } from 'react-native-chart-kit';
 import Svg, { Circle } from 'react-native-svg';
 import { useRouter } from 'expo-router';
+import { VictoryPie, VictoryChart, VictoryBar, VictoryAxis, VictoryLabel } from 'victory-native';
+import { BlurView } from 'expo-blur';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 interface ProgressRingProps {
   progress: number;
@@ -248,8 +251,49 @@ const NutrientTrendChart = ({ data, nutrient, color }: { data: NutrientTrendData
   );
 };
 
+const MacroCard = ({ title, current, target, unit, icon, colors }: {
+  title: string;
+  current: number;
+  target: number;
+  unit: string;
+  icon: string;
+  colors: string[];
+}) => {
+  const percentage = Math.min((current / target) * 100, 100);
+  
+  return (
+    <Animated.View 
+      entering={FadeInUp.delay(200)} 
+      style={styles.macroCard}
+    >
+      <BlurView intensity={20} style={styles.cardBlur}>
+        <LinearGradient
+          colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+          style={styles.cardGradient}
+        >
+          <View style={styles.cardHeader}>
+            <Ionicons name={icon as any} size={24} color={colors[0]} />
+            <Text style={styles.cardTitle}>{title}</Text>
+          </View>
+          <View style={styles.cardContent}>
+            <Text style={styles.currentValue}>{current}{unit}</Text>
+            <Text style={styles.targetValue}>of {target}{unit}</Text>
+          </View>
+          <View style={styles.progressBarContainer}>
+            <LinearGradient
+              colors={colors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.progressBar, { width: `${percentage}%` }]}
+            />
+          </View>
+        </LinearGradient>
+      </BlurView>
+    </Animated.View>
+  );
+};
+
 const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizationProps) => {
-  // Use result data if available, otherwise use daily progress
   const nutritionData = result ? {
     calories: result.nutritional_content.calories,
     protein: result.nutritional_content.macronutrients.protein.amount,
@@ -262,103 +306,169 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
     fats: dailyProgress.fat,
   };
 
-  const macroData = [
-    { name: 'Protein', value: nutritionData.protein, color: COLORS.protein[0] },
-    { name: 'Carbs', value: nutritionData.carbs, color: COLORS.carbs[0] },
-    { name: 'Fats', value: nutritionData.fats, color: COLORS.fats[0] },
+  const macroPercentages = [
+    { x: 'Protein', y: nutritionData.protein * 4 },
+    { x: 'Carbs', y: nutritionData.carbs * 4 },
+    { x: 'Fats', y: nutritionData.fats * 9 },
   ];
 
+  const totalCalories = macroPercentages.reduce((acc, curr) => acc + curr.y, 0);
+  const macroData = macroPercentages.map(item => ({
+    ...item,
+    y: (item.y / totalCalories) * 100,
+  }));
+
   return (
-    <View style={styles.visualizationContainer}>
-      {/* Daily Progress Overview */}
-      <View style={styles.progressOverview}>
-        <Text style={styles.sectionTitle}>Daily Progress</Text>
-        <View style={styles.progressRings}>
-          <View style={styles.progressRingItem}>
-            <AnimatedProgressRing
-              progress={(nutritionData.calories / 2000) * 100}
-              size={80}
-              strokeWidth={8}
-              color={COLORS.calories[0]}
-            />
-            <Text style={styles.progressLabel}>Calories</Text>
-            <Text style={styles.progressValue}>{nutritionData.calories} kcal</Text>
-          </View>
-          <View style={styles.progressRingItem}>
-            <AnimatedProgressRing
-              progress={(nutritionData.protein / 50) * 100}
-              size={80}
-              strokeWidth={8}
-              color={COLORS.protein[0]}
-            />
-            <Text style={styles.progressLabel}>Protein</Text>
-            <Text style={styles.progressValue}>{nutritionData.protein}g</Text>
-          </View>
-          <View style={styles.progressRingItem}>
-            <AnimatedProgressRing
-              progress={(nutritionData.carbs / 300) * 100}
-              size={80}
-              strokeWidth={8}
-              color={COLORS.carbs[0]}
-            />
-            <Text style={styles.progressLabel}>Carbs</Text>
-            <Text style={styles.progressValue}>{nutritionData.carbs}g</Text>
-          </View>
-        </View>
-      </View>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Calories Overview */}
+      <Animated.View entering={FadeInDown.delay(100)} style={styles.caloriesCard}>
+        <BlurView intensity={20} style={styles.cardBlur}>
+          <LinearGradient
+            colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+            style={styles.cardGradient}
+          >
+            <Text style={styles.sectionTitle}>Daily Calories</Text>
+            <View style={styles.caloriesContent}>
+              <Text style={styles.caloriesValue}>{nutritionData.calories}</Text>
+              <Text style={styles.caloriesUnit}>kcal</Text>
+            </View>
+            <View style={styles.caloriesProgress}>
+              <LinearGradient
+                colors={COLORS.calories}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.progressBar, { width: `${(nutritionData.calories / 2000) * 100}%` }]}
+              />
+            </View>
+            <Text style={styles.caloriesTarget}>Daily Target: 2000 kcal</Text>
+          </LinearGradient>
+        </BlurView>
+      </Animated.View>
 
       {/* Macro Distribution */}
-      <View style={styles.macroDistribution}>
-        <Text style={styles.sectionTitle}>Macro Distribution</Text>
-        <MacroDistributionChart data={macroData} />
-      </View>
+      <Animated.View entering={FadeInDown.delay(150)} style={styles.macroDistribution}>
+        <BlurView intensity={20} style={styles.cardBlur}>
+          <LinearGradient
+            colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+            style={styles.cardGradient}
+          >
+            <Text style={styles.sectionTitle}>Macro Distribution</Text>
+            <View style={styles.chartContainer}>
+              <VictoryPie
+                data={macroData}
+                width={250}
+                height={250}
+                colorScale={[COLORS.protein[0], COLORS.carbs[0], COLORS.fats[0]]}
+                innerRadius={70}
+                labelRadius={({ innerRadius }) => (innerRadius as number) + 30}
+                style={{
+                  labels: {
+                    fill: 'white',
+                    fontSize: 14,
+                  },
+                }}
+                animate={{
+                  duration: 1000,
+                  easing: 'bounce',
+                }}
+              />
+              <View style={styles.macroLegend}>
+                {macroData.map((item, index) => (
+                  <View key={item.x} style={styles.legendItem}>
+                    <View style={[styles.legendColor, { backgroundColor: [COLORS.protein[0], COLORS.carbs[0], COLORS.fats[0]][index] }]} />
+                    <Text style={styles.legendText}>{item.x}: {Math.round(item.y)}%</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </LinearGradient>
+        </BlurView>
+      </Animated.View>
 
-      {/* Nutrient Tracking */}
-      <View style={styles.nutrientCardsContainer}>
-        <Text style={styles.sectionTitle}>Nutrient Tracking</Text>
-        <NutrientCard
+      {/* Macro Tracking Cards */}
+      <View style={styles.macroCards}>
+        <MacroCard
           title="Protein"
           current={nutritionData.protein}
           target={50}
           unit="g"
-          colors={COLORS.protein}
           icon="barbell-outline"
+          colors={COLORS.protein}
         />
-        <NutrientCard
+        <MacroCard
           title="Carbs"
           current={nutritionData.carbs}
-          target={300}
+          target={225}
           unit="g"
-          colors={COLORS.carbs}
           icon="leaf-outline"
+          colors={COLORS.carbs}
         />
-        <NutrientCard
+        <MacroCard
           title="Fats"
           current={nutritionData.fats}
           target={65}
           unit="g"
-          colors={COLORS.fats}
           icon="water-outline"
+          colors={COLORS.fats}
         />
       </View>
 
-      {/* Stats Overview */}
-      <View style={styles.statsOverview}>
-        <Text style={styles.sectionTitle}>Today's Overview</Text>
-        <View style={styles.statsGrid}>
-          <View style={styles.statItem}>
-            <Ionicons name="restaurant-outline" size={24} color="#4C6EF5" />
-            <Text style={styles.statLabel}>Meals Logged</Text>
-            <Text style={styles.statValue}>{dailyProgress.meals_logged}</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons name="flame-outline" size={24} color="#4C6EF5" />
-            <Text style={styles.statLabel}>Calories Goal</Text>
-            <Text style={styles.statValue}>2000 kcal</Text>
-          </View>
-        </View>
-      </View>
-    </View>
+      {/* Weekly Progress */}
+      <Animated.View entering={FadeInUp.delay(250)} style={styles.weeklyProgress}>
+        <BlurView intensity={20} style={styles.cardBlur}>
+          <LinearGradient
+            colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+            style={styles.cardGradient}
+          >
+            <Text style={styles.sectionTitle}>Weekly Progress</Text>
+            <VictoryChart
+              height={200}
+              padding={{ top: 20, bottom: 40, left: 40, right: 20 }}
+            >
+              <VictoryAxis
+                tickFormat={(t) => `Day ${t}`}
+                style={{
+                  axis: { stroke: 'rgba(255,255,255,0.3)' },
+                  tickLabels: { fill: 'rgba(255,255,255,0.6)', fontSize: 10 },
+                }}
+              />
+              <VictoryAxis
+                dependentAxis
+                tickFormat={(t) => `${t}%`}
+                style={{
+                  axis: { stroke: 'rgba(255,255,255,0.3)' },
+                  tickLabels: { fill: 'rgba(255,255,255,0.6)', fontSize: 10 },
+                }}
+              />
+              <VictoryBar
+                data={[
+                  { x: 1, y: 80 },
+                  { x: 2, y: 90 },
+                  { x: 3, y: 85 },
+                  { x: 4, y: 95 },
+                  { x: 5, y: 88 },
+                  { x: 6, y: 92 },
+                  { x: 7, y: (nutritionData.calories / 2000) * 100 },
+                ]}
+                style={{
+                  data: {
+                    fill: ({ datum }) => {
+                      const gradient = COLORS.calories;
+                      return datum.x === 7 ? gradient[0] : 'rgba(255,255,255,0.2)';
+                    },
+                  },
+                }}
+                animate={{
+                  duration: 500,
+                  onLoad: { duration: 500 },
+                }}
+                cornerRadius={5}
+              />
+            </VictoryChart>
+          </LinearGradient>
+        </BlurView>
+      </Animated.View>
+    </ScrollView>
   );
 };
 
@@ -1070,5 +1180,131 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  caloriesCard: {
+    height: 150,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  cardBlur: {
+    flex: 1,
+    overflow: 'hidden',
+    borderRadius: 20,
+  },
+  cardGradient: {
+    flex: 1,
+    padding: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 12,
+  },
+  caloriesContent: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginVertical: 8,
+  },
+  caloriesValue: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  caloriesUnit: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.7)',
+    marginLeft: 4,
+  },
+  caloriesProgress: {
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 3,
+    marginVertical: 8,
+  },
+  progressBar: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  caloriesTarget: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  macroDistribution: {
+    height: 400,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  chartContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  macroLegend: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 16,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendColor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  legendText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+  },
+  macroCards: {
+    marginBottom: 16,
+  },
+  macroCard: {
+    height: 120,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 8,
+  },
+  cardContent: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 8,
+  },
+  currentValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  targetValue: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    marginLeft: 8,
+  },
+  progressBarContainer: {
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 2,
+  },
+  weeklyProgress: {
+    height: 300,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 16,
   },
 });
