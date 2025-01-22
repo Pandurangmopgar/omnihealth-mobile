@@ -63,20 +63,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="nutritionanalyzer"
-        options={{
-          title: 'Nutrition',
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="nutrition-outline" size={24} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="aiassistant"
         options={{
           title: 'Assistant',
           tabBarIcon: ({ color }) => (
             <Ionicons name="chatbubble-ellipses-outline" size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="nutritionanalyzer"
+        options={{
+          title: 'Nutrition',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="nutrition-outline" size={24} color={color} />
           ),
         }}
       />

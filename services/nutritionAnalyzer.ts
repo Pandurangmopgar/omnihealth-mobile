@@ -411,4 +411,4 @@ function getDefaultGoals() {
   return defaults;
 }
 
-export { analyzeNutrition, getDailyProgress, getDailyGoals };
+export { analyzeNutrition, getDailyProgress, getDailyGoals, getDefaultGoals };

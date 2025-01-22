@@ -284,7 +284,10 @@ const MacroCard = ({ title, current, target, unit, icon, colors }: {
               colors={colors}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={[styles.progressBar, { width: `${percentage}%` }]}
+              style={[
+                styles.progressBar,
+                { width: `${percentage}%` }
+              ]}
             />
           </View>
         </LinearGradient>
@@ -606,14 +609,14 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B1120',
+    backgroundColor: '#000',
   },
   gradient: {
     flex: 1,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -626,6 +629,58 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  cardBlur: {
+    flex: 1,
+    overflow: 'hidden',
+    borderRadius: 20,
+  },
+  cardGradient: {
+    flex: 1,
+    padding: 16,
+  },
+  progressBar: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  caloriesCard: {
+    height: 150,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  caloriesContent: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginVertical: 8,
+  },
+  caloriesValue: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  caloriesUnit: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.7)',
+    marginLeft: 4,
+  },
+  caloriesProgress: {
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 3,
+    marginVertical: 8,
+  },
+  caloriesTarget: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  dashboardButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     flex: 1,
@@ -874,6 +929,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 12,
   },
   benefitsContainer: {
     gap: 8,
@@ -950,102 +1006,12 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   macroDistribution: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 16,
-  },
-  nutrientTrends: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 16,
-  },
-  dashboardButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statsOverview: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 24,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 16,
-  },
-  statItem: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  caloriesCard: {
-    height: 150,
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  cardBlur: {
-    flex: 1,
-    overflow: 'hidden',
-    borderRadius: 20,
-  },
-  cardGradient: {
-    flex: 1,
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#fff',
-    marginBottom: 12,
-  },
-  caloriesContent: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginVertical: 8,
-  },
-  caloriesValue: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  caloriesUnit: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.7)',
-    marginLeft: 4,
-  },
-  caloriesProgress: {
-    height: 6,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 3,
-    marginVertical: 8,
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  caloriesTarget: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  macroDistribution: {
     height: 400,
     borderRadius: 20,
     overflow: 'hidden',
     marginBottom: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    padding: 16,
   },
   chartContainer: {
     alignItems: 'center',
@@ -1116,6 +1082,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     marginBottom: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    padding: 16,
   },
   nutrientDetails: {
     marginTop: 16,
@@ -1175,6 +1143,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 12,
     borderRadius: 12,
+    flex: 1,
   },
   activeTab: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
