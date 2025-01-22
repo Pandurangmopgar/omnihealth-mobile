@@ -300,7 +300,8 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
     daily_carbs: number;
     daily_fat: number;
   } | null>(null);
-
+  const [activeTab, setActiveTab] = useState('overview');
+  const [isLoading, setIsLoading] = useState(true);
   const { userId } = useAuth();
 
   useEffect(() => {
@@ -311,6 +312,8 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
           setGoals(userGoals);
         } catch (error) {
           console.error('Error fetching goals:', error);
+        } finally {
+          setIsLoading(false);
         }
       }
     };
@@ -343,183 +346,259 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
     fats: (macroCalories.fats / totalCalories) * 100 || 0,
   };
 
-  return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Calories Overview */}
-      <Animated.View entering={FadeInDown.delay(100)} style={styles.caloriesCard}>
-        <BlurView intensity={20} style={styles.cardBlur}>
-          <LinearGradient
-            colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
-            style={styles.cardGradient}
-          >
-            <Text style={styles.sectionTitle}>Daily Calories</Text>
-            <View style={styles.caloriesContent}>
-              <Text style={styles.caloriesValue}>{nutritionData.calories}</Text>
-              <Text style={styles.caloriesUnit}>kcal</Text>
-            </View>
-            <View style={styles.caloriesProgress}>
-              <LinearGradient
-                colors={COLORS.calories}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[
-                  styles.progressBar,
-                  { width: `${(nutritionData.calories / (goals?.daily_calories || 2000)) * 100}%` }
-                ]}
-              />
-            </View>
-            <Text style={styles.caloriesTarget}>
-              Daily Target: {goals?.daily_calories || 2000} kcal
-            </Text>
-          </LinearGradient>
-        </BlurView>
-      </Animated.View>
-
-      {/* Macro Distribution */}
-      <Animated.View entering={FadeInDown.delay(150)} style={styles.macroDistribution}>
-        <BlurView intensity={20} style={styles.cardBlur}>
-          <LinearGradient
-            colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
-            style={styles.cardGradient}
-          >
-            <Text style={styles.sectionTitle}>Macro Distribution</Text>
-            <View style={styles.chartContainer}>
-              <VictoryPie
-                data={[
-                  { x: 'Protein', y: macroPercentages.protein },
-                  { x: 'Carbs', y: macroPercentages.carbs },
-                  { x: 'Fats', y: macroPercentages.fats },
-                ]}
-                width={250}
-                height={250}
-                colorScale={[COLORS.protein[0], COLORS.carbs[0], COLORS.fats[0]]}
-                innerRadius={70}
-                labelRadius={({ innerRadius }) => (innerRadius as number) + 30}
-                style={{
-                  labels: {
-                    fill: 'white',
-                    fontSize: 14,
-                  },
-                }}
-                animate={{
-                  duration: 1000,
-                  easing: 'bounce',
-                }}
-              />
-              <View style={styles.macroLegend}>
-                {Object.entries(macroPercentages).map(([macro, percentage], index) => (
-                  <View key={macro} style={styles.legendItem}>
-                    <View style={[styles.legendColor, { backgroundColor: [COLORS.protein[0], COLORS.carbs[0], COLORS.fats[0]][index] }]} />
-                    <View style={styles.legendTextContainer}>
-                      <Text style={styles.legendText}>
-                        {macro.charAt(0).toUpperCase() + macro.slice(1)}: {Math.round(percentage)}%
-                      </Text>
-                      <Text style={styles.legendSubtext}>
-                        {nutritionData[macro as keyof typeof nutritionData]}g / {goals?.[`daily_${macro}` as keyof typeof goals]}g
-                      </Text>
-                    </View>
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return (
+          <>
+            {/* Calories Overview */}
+            <Animated.View entering={FadeInDown.delay(100)} style={styles.caloriesCard}>
+              <BlurView intensity={20} style={styles.cardBlur}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+                  style={styles.cardGradient}
+                >
+                  <Text style={styles.sectionTitle}>Daily Calories</Text>
+                  <View style={styles.caloriesContent}>
+                    <Text style={styles.caloriesValue}>{nutritionData.calories}</Text>
+                    <Text style={styles.caloriesUnit}>kcal</Text>
                   </View>
-                ))}
-              </View>
-            </View>
-          </LinearGradient>
-        </BlurView>
-      </Animated.View>
-
-      {/* Nutrient Details */}
-      <Animated.View entering={FadeInDown.delay(200)} style={styles.nutrientDetails}>
-        <BlurView intensity={20} style={styles.cardBlur}>
-          <LinearGradient
-            colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
-            style={styles.cardGradient}
-          >
-            <Text style={styles.sectionTitle}>Nutrient Details</Text>
-            <View style={styles.nutrientGrid}>
-              {Object.entries(nutritionData).map(([nutrient, amount]) => (
-                <View key={nutrient} style={styles.nutrientItem}>
-                  <Text style={styles.nutrientLabel}>
-                    {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
-                  </Text>
-                  <Text style={styles.nutrientValue}>{amount}g</Text>
-                  <View style={styles.nutrientProgress}>
+                  <View style={styles.caloriesProgress}>
                     <LinearGradient
-                      colors={COLORS[nutrient as keyof typeof COLORS]}
+                      colors={COLORS.calories}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={[
-                        styles.nutrientProgressBar,
-                        {
-                          width: `${(amount / (goals?.[`daily_${nutrient}` as keyof typeof goals] || 1)) * 100}%`
-                        }
+                        styles.progressBar,
+                        { width: `${(nutritionData.calories / (goals?.daily_calories || 2000)) * 100}%` }
                       ]}
                     />
                   </View>
-                  <Text style={styles.nutrientTarget}>
-                    Target: {goals?.[`daily_${nutrient}` as keyof typeof goals]}g
+                  <Text style={styles.caloriesTarget}>
+                    Daily Target: {goals?.daily_calories || 2000} kcal
                   </Text>
-                </View>
-              ))}
-            </View>
-          </LinearGradient>
-        </BlurView>
-      </Animated.View>
+                </LinearGradient>
+              </BlurView>
+            </Animated.View>
 
-      {/* Weekly Progress */}
-      <Animated.View entering={FadeInUp.delay(250)} style={styles.weeklyProgress}>
-        <BlurView intensity={20} style={styles.cardBlur}>
-          <LinearGradient
-            colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
-            style={styles.cardGradient}
-          >
-            <Text style={styles.sectionTitle}>Weekly Progress</Text>
-            <VictoryChart
-              height={200}
-              padding={{ top: 20, bottom: 40, left: 40, right: 20 }}
-              domainPadding={{ x: 20 }}
-            >
-              <VictoryAxis
-                tickFormat={(t) => `Day ${t}`}
-                style={{
-                  axis: { stroke: 'rgba(255,255,255,0.3)' },
-                  tickLabels: { fill: 'rgba(255,255,255,0.6)', fontSize: 10 },
-                }}
-              />
-              <VictoryAxis
-                dependentAxis
-                tickFormat={(t) => `${t}%`}
-                style={{
-                  axis: { stroke: 'rgba(255,255,255,0.3)' },
-                  tickLabels: { fill: 'rgba(255,255,255,0.6)', fontSize: 10 },
-                }}
-              />
-              <VictoryBar
-                data={[
-                  { x: 1, y: 80 },
-                  { x: 2, y: 90 },
-                  { x: 3, y: 85 },
-                  { x: 4, y: 95 },
-                  { x: 5, y: 88 },
-                  { x: 6, y: 92 },
-                  { x: 7, y: (nutritionData.calories / (goals?.daily_calories || 2000)) * 100 },
-                ]}
-                style={{
-                  data: {
-                    fill: ({ datum }) => {
-                      const gradient = COLORS.calories;
-                      return datum.x === 7 ? gradient[0] : 'rgba(255,255,255,0.2)';
-                    },
-                  },
-                }}
-                animate={{
-                  duration: 500,
-                  onLoad: { duration: 500 },
-                }}
-                cornerRadius={5}
-              />
-            </VictoryChart>
-          </LinearGradient>
-        </BlurView>
-      </Animated.View>
+            {/* Macro Distribution */}
+            <Animated.View entering={FadeInDown.delay(150)} style={styles.macroDistribution}>
+              <BlurView intensity={20} style={styles.cardBlur}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+                  style={styles.cardGradient}
+                >
+                  <Text style={styles.sectionTitle}>Macro Distribution</Text>
+                  <View style={styles.chartContainer}>
+                    <VictoryPie
+                      data={[
+                        { x: 'Protein', y: macroPercentages.protein },
+                        { x: 'Carbs', y: macroPercentages.carbs },
+                        { x: 'Fats', y: macroPercentages.fats },
+                      ]}
+                      width={250}
+                      height={250}
+                      colorScale={[COLORS.protein[0], COLORS.carbs[0], COLORS.fats[0]]}
+                      innerRadius={70}
+                      labelRadius={({ innerRadius }) => (innerRadius as number) + 30}
+                      style={{
+                        labels: {
+                          fill: 'white',
+                          fontSize: 14,
+                        },
+                      }}
+                      animate={{
+                        duration: 1000,
+                        easing: 'bounce',
+                      }}
+                    />
+                    <View style={styles.macroLegend}>
+                      {Object.entries(macroPercentages).map(([macro, percentage], index) => (
+                        <TouchableOpacity 
+                          key={macro} 
+                          style={styles.legendItem}
+                          onPress={() => setActiveTab('details')}
+                        >
+                          <View style={[styles.legendColor, { backgroundColor: [COLORS.protein[0], COLORS.carbs[0], COLORS.fats[0]][index] }]} />
+                          <View style={styles.legendTextContainer}>
+                            <Text style={styles.legendText}>
+                              {macro.charAt(0).toUpperCase() + macro.slice(1)}: {Math.round(percentage)}%
+                            </Text>
+                            <Text style={styles.legendSubtext}>
+                              {nutritionData[macro as keyof typeof nutritionData]}g / {goals?.[`daily_${macro}` as keyof typeof goals]}g
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                </LinearGradient>
+              </BlurView>
+            </Animated.View>
+          </>
+        );
+
+      case 'details':
+        return (
+          <Animated.View entering={FadeInDown} style={styles.nutrientDetails}>
+            <BlurView intensity={20} style={styles.cardBlur}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+                style={styles.cardGradient}
+              >
+                <Text style={styles.sectionTitle}>Nutrient Details</Text>
+                <View style={styles.nutrientGrid}>
+                  {Object.entries(nutritionData).map(([nutrient, amount]) => (
+                    <Animated.View 
+                      key={nutrient} 
+                      entering={FadeInDown.delay(200)} 
+                      style={styles.nutrientItem}
+                    >
+                      <Text style={styles.nutrientLabel}>
+                        {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
+                      </Text>
+                      <Text style={styles.nutrientValue}>{amount}g</Text>
+                      <View style={styles.nutrientProgress}>
+                        <LinearGradient
+                          colors={COLORS[nutrient as keyof typeof COLORS]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={[
+                            styles.nutrientProgressBar,
+                            {
+                              width: `${(amount / (goals?.[`daily_${nutrient}` as keyof typeof goals] || 1)) * 100}%`
+                            }
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.nutrientTarget}>
+                        Target: {goals?.[`daily_${nutrient}` as keyof typeof goals]}g
+                      </Text>
+                    </Animated.View>
+                  ))}
+                </View>
+              </LinearGradient>
+            </BlurView>
+          </Animated.View>
+        );
+
+      case 'trends':
+        return (
+          <Animated.View entering={FadeInUp.delay(250)} style={styles.weeklyProgress}>
+            <BlurView intensity={20} style={styles.cardBlur}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+                style={styles.cardGradient}
+              >
+                <Text style={styles.sectionTitle}>Weekly Progress</Text>
+                <VictoryChart
+                  height={200}
+                  padding={{ top: 20, bottom: 40, left: 40, right: 20 }}
+                  domainPadding={{ x: 20 }}
+                >
+                  <VictoryAxis
+                    tickFormat={(t) => `Day ${t}`}
+                    style={{
+                      axis: { stroke: 'rgba(255,255,255,0.3)' },
+                      tickLabels: { fill: 'rgba(255,255,255,0.6)', fontSize: 10 },
+                    }}
+                  />
+                  <VictoryAxis
+                    dependentAxis
+                    tickFormat={(t) => `${t}%`}
+                    style={{
+                      axis: { stroke: 'rgba(255,255,255,0.3)' },
+                      tickLabels: { fill: 'rgba(255,255,255,0.6)', fontSize: 10 },
+                    }}
+                  />
+                  <VictoryBar
+                    data={[
+                      { x: 1, y: 80 },
+                      { x: 2, y: 90 },
+                      { x: 3, y: 85 },
+                      { x: 4, y: 95 },
+                      { x: 5, y: 88 },
+                      { x: 6, y: 92 },
+                      { x: 7, y: (nutritionData.calories / (goals?.daily_calories || 2000)) * 100 },
+                    ]}
+                    style={{
+                      data: {
+                        fill: ({ datum }) => {
+                          return datum.x === 7 ? COLORS.calories[0] : 'rgba(255,255,255,0.2)';
+                        },
+                      },
+                    }}
+                    animate={{
+                      duration: 500,
+                      onLoad: { duration: 500 },
+                    }}
+                    cornerRadius={5}
+                  />
+                </VictoryChart>
+              </LinearGradient>
+            </BlurView>
+          </Animated.View>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.protein[0]} />
+        <Text style={styles.loadingText}>Loading nutrition data...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
+          onPress={() => setActiveTab('overview')}
+        >
+          <Ionicons 
+            name="pie-chart-outline" 
+            size={24} 
+            color={activeTab === 'overview' ? COLORS.protein[0] : '#9CA3AF'} 
+          />
+          <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>
+            Overview
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'details' && styles.activeTab]}
+          onPress={() => setActiveTab('details')}
+        >
+          <Ionicons 
+            name="list-outline" 
+            size={24} 
+            color={activeTab === 'details' ? COLORS.carbs[0] : '#9CA3AF'} 
+          />
+          <Text style={[styles.tabText, activeTab === 'details' && styles.activeTabText]}>
+            Details
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'trends' && styles.activeTab]}
+          onPress={() => setActiveTab('trends')}
+        >
+          <Ionicons 
+            name="trending-up-outline" 
+            size={24} 
+            color={activeTab === 'trends' ? COLORS.fats[0] : '#9CA3AF'} 
+          />
+          <Text style={[styles.tabText, activeTab === 'trends' && styles.activeTabText]}>
+            Trends
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {renderTabContent()}
     </ScrollView>
   );
 };
@@ -1081,6 +1160,32 @@ const styles = StyleSheet.create({
   legendSubtext: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+  },
+  activeTab: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  tabText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginLeft: 8,
+  },
+  activeTabText: {
+    color: '#fff',
   },
 });
 
