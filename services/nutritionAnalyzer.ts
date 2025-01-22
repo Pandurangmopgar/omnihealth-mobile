@@ -24,7 +24,7 @@ const systemPrompt = `You are NutrInfo, a specialized AI for analyzing food desc
 For text descriptions:
 1. Parse the food description and quantity
 2. Calculate nutritional content based on standard portions
-3. Provide health insights
+3. Provide health insights and calculate health score
 4. Consider common preparation methods
 5. Suggest alternatives
 
@@ -43,9 +43,21 @@ Return analysis in this exact JSON structure:
       "protein": { "amount": number, "unit": "g", "daily_value_percentage": number },
       "carbs": { "amount": number, "unit": "g", "daily_value_percentage": number },
       "fats": { "amount": number, "unit": "g", "daily_value_percentage": number }
+    },
+    "micronutrients": {
+      "vitamins": [
+        { "name": string, "amount": number, "unit": string, "daily_value_percentage": number }
+      ],
+      "minerals": [
+        { "name": string, "amount": number, "unit": string, "daily_value_percentage": number }
+      ]
     }
   },
   "health_analysis": {
+    "health_score": {
+      "score": number,
+      "factors": string[]
+    },
     "benefits": string[],
     "considerations": string[],
     "allergens": string[],
@@ -54,7 +66,11 @@ Return analysis in this exact JSON structure:
   "recommendations": {
     "serving_suggestions": string[],
     "healthier_alternatives": string[],
-    "local_options": string[]
+    "local_options": string[],
+    "meal_timing": {
+      "best_time": string,
+      "reason": string
+    }
   },
   "source_reliability": "verified" | "estimated",
   "meal_type": "breakfast" | "lunch" | "dinner" | "snack"
@@ -75,8 +91,26 @@ interface NutritionAnalysis {
       carbs: { amount: number; unit: 'g'; daily_value_percentage: number };
       fats: { amount: number; unit: 'g'; daily_value_percentage: number };
     };
+    micronutrients: {
+      vitamins: Array<{
+        name: string;
+        amount: number;
+        unit: string;
+        daily_value_percentage: number;
+      }>;
+      minerals: Array<{
+        name: string;
+        amount: number;
+        unit: string;
+        daily_value_percentage: number;
+      }>;
+    };
   };
   health_analysis: {
+    health_score: {
+      score: number;
+      factors: string[];
+    };
     benefits: string[];
     considerations: string[];
     allergens: string[];
@@ -86,6 +120,10 @@ interface NutritionAnalysis {
     serving_suggestions: string[];
     healthier_alternatives: string[];
     local_options: string[];
+    meal_timing: {
+      best_time: string;
+      reason: string;
+    };
   };
   source_reliability: 'verified' | 'estimated';
   meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
