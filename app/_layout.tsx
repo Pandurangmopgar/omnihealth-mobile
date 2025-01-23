@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import { ThemeProvider, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
+import { sendTestNotification, registerForPushNotifications } from '../services/pushNotifications';
 
 const tokenCache = {
   async getToken(key: string) {
@@ -26,6 +27,24 @@ const tokenCache = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    async function initializeNotifications() {
+      try {
+        // Register for push notifications first
+        const userId = await SecureStore.getItemAsync('userId');
+        if (userId) {
+          await registerForPushNotifications(userId);
+          // Send test notification after registration
+          await sendTestNotification();
+        }
+      } catch (error) {
+        console.error('Error initializing notifications:', error);
+      }
+    }
+
+    initializeNotifications();
+  }, []);
 
   return (
     <ClerkProvider

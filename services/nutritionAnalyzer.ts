@@ -129,6 +129,28 @@ interface NutritionAnalysis {
   meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
 }
 
+interface MealTiming {
+  hour: number;
+  minute: number;
+}
+
+interface MealTimings {
+  [key: string]: MealTiming[];
+}
+
+interface NutritionProgress {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  meals_logged: number;
+}
+
+interface ReminderSettings {
+  meal: string;
+  time: MealTiming;
+}
+
 class NutritionAnalysisError extends Error {
   constructor(message: string) {
     super(message);
@@ -261,7 +283,7 @@ async function analyzeNutrition(
   type: 'text' | 'image',
   content: string,
   userId: string
-): Promise<{ analysis: NutritionAnalysis; progress: { calories: number; protein: number; carbs: number; fat: number; meals_logged: number } }> {
+): Promise<{ analysis: NutritionAnalysis; progress: NutritionProgress }> {
   try {
     if (!userId) {
       throw new Error('User ID is required');
@@ -309,7 +331,119 @@ async function analyzeNutrition(
   }
 };
 
-async function getDailyProgress(userId: string): Promise<{ progress: { calories: number; protein: number; carbs: number; fat: number; meals_logged: number; }, goals: { daily_calories: number; daily_protein: number; daily_carbs: number; daily_fat: number } }> {
+async function generateNutritionReport(userId: string) {
+  try {
+    // Fetch user's data
+    const [progressData, goalsData] = await Promise.all([
+      getDailyProgress(userId),
+      getDailyGoals(userId)
+    ]);
+
+    // Calculate completion percentages
+    const completion = {
+      calories: (progressData.progress.calories / goalsData.daily_calories) * 100,
+      protein: (progressData.progress.protein / goalsData.daily_protein) * 100,
+      carbs: (progressData.progress.carbs / goalsData.daily_carbs) * 100,
+      fat: (progressData.progress.fat / goalsData.daily_fat) * 100
+    };
+
+    // Generate report using AI
+    const reportPrompt = `Generate a detailed nutrition report based on this data:
+    Progress: ${JSON.stringify(progressData)}
+    Goals: ${JSON.stringify(goalsData)}
+    Completion: ${JSON.stringify(completion)}
+
+    Include:
+    1. Overall progress summary
+    2. Specific nutrient analysis
+    3. Personalized recommendations
+    4. Areas needing attention
+    5. Positive achievements
+    6. Tips for improvement
+
+    Format the response in a user-friendly way with sections and bullet points.`;
+
+    const result = await model.generateContent(reportPrompt);
+    const reportText = result.response.text();
+    
+    // Store the report in Redis
+    interface RedisHashData {
+      [key: string]: string;
+    }
+    const hashData: RedisHashData = {
+      latest: JSON.stringify({
+        report: reportText,
+        timestamp: new Date().toISOString(),
+        data: { progressData, goalsData, completion }
+      })
+    };
+    await redis.hset(`user:${userId}:reports`, hashData);
+
+    return reportText;
+  } catch (error) {
+    console.error('Error generating report:', error);
+    throw error;
+  }
+}
+
+async function calculateOptimalReminders(userId: string): Promise<ReminderSettings[]> {
+  const defaultReminders: ReminderSettings[] = [
+    { meal: 'breakfast', time: { hour: 8, minute: 0 } },
+    { meal: 'morning_snack', time: { hour: 10, minute: 30 } },
+    { meal: 'lunch', time: { hour: 13, minute: 0 } },
+    { meal: 'evening_snack', time: { hour: 16, minute: 30 } },
+    { meal: 'dinner', time: { hour: 19, minute: 0 } }
+  ];
+
+  try {
+    // Get user's nutrition logs to analyze patterns
+    const { data: logs, error } = await supabase
+      .from('nutrition_analysis')
+      .select('created_at, meal_type')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    if (!logs || logs.length === 0) {
+      return defaultReminders;
+    }
+
+    // Analyze user's meal timing patterns
+    const mealTimings: MealTimings = logs.reduce((acc: MealTimings, log) => {
+      const date = new Date(log.created_at);
+      const hour = date.getHours();
+      const minute = date.getMinutes();
+      
+      if (!acc[log.meal_type]) {
+        acc[log.meal_type] = [];
+      }
+      acc[log.meal_type].push({ hour, minute });
+      return acc;
+    }, {});
+
+    // Calculate average times for each meal
+    const optimizedReminders = defaultReminders.map(reminder => {
+      const mealLogs = mealTimings[reminder.meal];
+      if (mealLogs && mealLogs.length > 0) {
+        const avgHour = Math.round(mealLogs.reduce((sum: number, time: MealTiming) => sum + time.hour, 0) / mealLogs.length);
+        const avgMinute = Math.round(mealLogs.reduce((sum: number, time: MealTiming) => sum + time.minute, 0) / mealLogs.length);
+        return {
+          ...reminder,
+          time: { hour: avgHour, minute: avgMinute }
+        };
+      }
+      return reminder;
+    });
+
+    return optimizedReminders;
+  } catch (error) {
+    console.error('Error calculating optimal reminders:', error);
+    return defaultReminders;
+  }
+}
+
+async function getDailyProgress(userId: string): Promise<{ progress: NutritionProgress; goals: { daily_calories: number; daily_protein: number; daily_carbs: number; daily_fat: number } }> {
   try {
     console.log('[Progress] Fetching progress for user:', userId);
     const today = new Date().toISOString().split('T')[0];
@@ -449,4 +583,44 @@ function getDefaultGoals() {
   return defaults;
 }
 
-export { analyzeNutrition, getDailyProgress, getDailyGoals, getDefaultGoals };
+async function checkNutritionGoals(userId: string): Promise<string> {
+  try {
+    const [progress, goals] = await Promise.all([
+      getDailyProgress(userId),
+      getDailyGoals(userId)
+    ]);
+
+    const remaining = {
+      calories: goals.daily_calories - progress.progress.calories,
+      protein: goals.daily_protein - progress.progress.protein,
+      carbs: goals.daily_carbs - progress.progress.carbs,
+      fat: goals.daily_fat - progress.progress.fat
+    };
+
+    // Generate personalized message using AI
+    const prompt = `Create a brief, motivational notification message based on this nutrition data:
+    Remaining Goals:
+    - Calories: ${remaining.calories}
+    - Protein: ${remaining.protein}g
+    - Carbs: ${remaining.carbs}g
+    - Fat: ${remaining.fat}g
+
+    Keep it encouraging and actionable. Maximum 2 sentences.`;
+
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (error) {
+    console.error('Error checking nutrition goals:', error);
+    return 'Remember to track your meals and stay on top of your nutrition goals!';
+  }
+}
+
+export { 
+  analyzeNutrition, 
+  getDailyProgress, 
+  getDailyGoals, 
+  getDefaultGoals,
+  generateNutritionReport,
+  calculateOptimalReminders,
+  checkNutritionGoals
+};

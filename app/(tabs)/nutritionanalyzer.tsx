@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { MotiView } from 'moti';
 import { useAuth } from '@clerk/clerk-expo';
-import { analyzeNutrition, getDailyProgress, getDailyGoals } from '../../services/nutritionAnalyzer';
+import { analyzeNutrition, getDailyProgress, getDailyGoals, generateNutritionReport } from '../../services/nutritionAnalyzer';
+import { registerForPushNotifications, scheduleNutritionReminders } from '../../services/pushNotifications';
 import { PieChart, LineChart } from 'react-native-chart-kit';
 import Svg, { Circle } from 'react-native-svg';
 import { useRouter } from 'expo-router';
@@ -82,8 +83,23 @@ interface DailyProgress {
 }
 
 interface NutritionVisualizationProps {
-  result?: NutritionResult | null;
-  dailyProgress: DailyProgress;
+  result: {
+    nutritional_content: {
+      calories: number;
+      macronutrients: {
+        protein: { amount: number };
+        carbs: { amount: number };
+        fats: { amount: number };
+      };
+    };
+  } | null;
+  dailyProgress: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    meals_logged: number;
+  };
 }
 
 // Color palette with gradients
@@ -284,7 +300,10 @@ const MacroCard = ({ title, current, target, unit, icon, colors }: {
               colors={colors}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={[styles.progressBar, { width: `${percentage}%` }]}
+              style={[
+                styles.progressBar,
+                { width: `${percentage}%` }
+              ]}
             />
           </View>
         </LinearGradient>
@@ -293,33 +312,69 @@ const MacroCard = ({ title, current, target, unit, icon, colors }: {
   );
 };
 
+const MealsLoggedIndicator = ({ mealsLogged }: { mealsLogged: number }) => (
+  <View style={styles.mealsLoggedContainer}>
+    <Text style={styles.mealsLoggedTitle}>Meals Logged Today</Text>
+    <View style={styles.mealsLoggedCircle}>
+      <Text style={styles.mealsLoggedNumber}>{mealsLogged}</Text>
+    </View>
+  </View>
+);
+
 const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizationProps) => {
+  const [activeTab, setActiveTab] = useState('progress');
+  const [report, setReport] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [goals, setGoals] = useState<{
     daily_calories: number;
     daily_protein: number;
     daily_carbs: number;
     daily_fat: number;
   } | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [isLoading, setIsLoading] = useState(true);
   const { userId } = useAuth();
 
   useEffect(() => {
-    const fetchGoals = async () => {
-      if (userId) {
-        try {
-          const userGoals = await getDailyGoals(userId);
-          setGoals(userGoals);
-        } catch (error) {
-          console.error('Error fetching goals:', error);
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    };
-    fetchGoals();
+    if (userId) {
+      setupNotifications();
+      fetchGoals();
+    }
   }, [userId]);
 
+  const setupNotifications = async () => {
+    if (!userId) return;
+    try {
+      const token = await registerForPushNotifications(userId);
+      await scheduleNutritionReminders(userId);
+    } catch (error) {
+      console.error('Error setting up notifications:', error);
+    }
+  };
+
+  const fetchGoals = async () => {
+    if (!userId) return;
+    try {
+      const userGoals = await getDailyGoals(userId);
+      setGoals(userGoals);
+    } catch (error) {
+      console.error('Error fetching goals:', error);
+    }
+  };
+
+  const generateReport = async () => {
+    if (!userId) return;
+    try {
+      setLoading(true);
+      const reportText = await generateNutritionReport(userId);
+      setReport(reportText);
+    } catch (error) {
+      console.error('Error generating report:', error);
+      Alert.alert('Error', 'Failed to generate nutrition report');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Calculate nutrition data
   const nutritionData = result ? {
     calories: result.nutritional_content.calories,
     protein: result.nutritional_content.macronutrients.protein.amount,
@@ -332,7 +387,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
     fat: dailyProgress.fat,
   };
 
-  // Calculate macro percentages based on caloric values
+  // Calculate macro percentages
   const macroCalories = {
     protein: nutritionData.protein * 4,
     carbs: nutritionData.carbs * 4,
@@ -346,9 +401,211 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
     fat: (macroCalories.fat / totalCalories) * 100 || 0,
   };
 
+  const formatAIResponse = (text: string) => {
+    if (!text) return null;
+    
+    const lines = text.split('\n');
+    return lines.map((line, index) => {
+      // Main headers (##)
+      if (line.startsWith('##')) {
+        return (
+          <Text key={index} style={styles.aiMainHeader}>
+            {line.replace(/##/g, '').trim()}
+          </Text>
+        );
+      }
+      
+      // Numbered headers (1., 2., etc)
+      if (/^\d+\./.test(line)) {
+        return (
+          <Text key={index} style={styles.aiNumberedHeader}>
+            {line.trim()}
+          </Text>
+        );
+      }
+
+      // List items with highlights (*)
+      if (line.trim().startsWith('*')) {
+        const content = line.trim().substring(1).trim();
+        // Extract content between ** **
+        const parts = content.split(/\*\*(.*?)\*\*/g).filter(Boolean);
+        
+        return (
+          <View key={index} style={styles.aiListItemContainer}>
+            <View style={styles.aiBulletPoint} />
+            <View style={styles.aiListContent}>
+              <Text style={styles.aiListItem}>
+                {parts.map((part, pIndex) => {
+                  // Even indices are normal text, odd indices are highlighted
+                  if (pIndex % 2 === 0) {
+                    return <Text key={pIndex} style={styles.aiNormalText}>{part}</Text>;
+                  } else {
+                    return (
+                      <Text key={pIndex} style={styles.aiHighlightedText}>
+                        {part}
+                      </Text>
+                    );
+                  }
+                })}
+              </Text>
+            </View>
+          </View>
+        );
+      }
+
+      // Regular text with potential highlights
+      if (line.trim()) {
+        const parts = line.trim().split(/\*\*(.*?)\*\*/g).filter(Boolean);
+        return (
+          <Text key={index} style={styles.aiRegularText}>
+            {parts.map((part, pIndex) => {
+              if (pIndex % 2 === 0) {
+                return <Text key={pIndex}>{part}</Text>;
+              } else {
+                return (
+                  <Text key={pIndex} style={styles.aiHighlightedText}>
+                    {part}
+                  </Text>
+                );
+              }
+            })}
+          </Text>
+        );
+      }
+
+      return <View key={index} style={styles.aiSpacer} />;
+    });
+  };
+
+  const renderReportTab = () => (
+    <Animated.View
+      entering={FadeInDown}
+      style={styles.reportContainer}
+    >
+      {loading ? (
+        <ActivityIndicator size="large" color="#4F46E5" />
+      ) : report ? (
+        <ScrollView style={styles.reportContent}>
+          <BlurView intensity={80} style={styles.reportCard}>
+            {formatAIResponse(report)}
+            <TouchableOpacity
+              style={styles.generateButton}
+              onPress={generateReport}
+            >
+              <Text style={styles.generateButtonText}>Generate New Report</Text>
+            </TouchableOpacity>
+          </BlurView>
+        </ScrollView>
+      ) : (
+        <TouchableOpacity
+          style={styles.generateButton}
+          onPress={generateReport}
+        >
+          <Ionicons name="document-text" size={24} color="#FFFFFF" />
+          <Text style={styles.generateButtonText}>Generate Nutrition Report</Text>
+        </TouchableOpacity>
+      )}
+    </Animated.View>
+  );
+
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'overview':
+      case 'progress':
+        return (
+          <>
+            {/* Calories Overview */}
+            <Animated.View entering={FadeInDown.delay(100)} style={styles.caloriesCard}>
+              <BlurView intensity={20} style={styles.cardBlur}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+                  style={styles.cardGradient}
+                >
+                  <Text style={styles.sectionTitle}>Daily Calories</Text>
+                  <View style={styles.caloriesContent}>
+                    <Text style={styles.caloriesValue}>{nutritionData.calories}</Text>
+                    <Text style={styles.caloriesUnit}>kcal</Text>
+                  </View>
+                  <View style={styles.caloriesProgress}>
+                    <LinearGradient
+                      colors={COLORS.calories}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={[
+                        styles.progressBar,
+                        { width: `${(nutritionData.calories / (goals?.daily_calories || 2000)) * 100}%` }
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.caloriesTarget}>
+                    Daily Target: {goals?.daily_calories || 2000} kcal
+                  </Text>
+                </LinearGradient>
+              </BlurView>
+            </Animated.View>
+
+            {/* Macro Distribution */}
+            <Animated.View entering={FadeInDown.delay(150)} style={styles.macroDistribution}>
+              <BlurView intensity={20} style={styles.cardBlur}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+                  style={styles.cardGradient}
+                >
+                  <Text style={styles.sectionTitle}>Macro Distribution</Text>
+                  <View style={styles.chartContainer}>
+                    <VictoryPie
+                      data={[
+                        { x: 'Protein', y: macroPercentages.protein },
+                        { x: 'Carbs', y: macroPercentages.carbs },
+                        { x: 'Fat', y: macroPercentages.fat },
+                      ]}
+                      width={250}
+                      height={250}
+                      colorScale={[COLORS.protein[0], COLORS.carbs[0], COLORS.fat[0]]}
+                      innerRadius={70}
+                      labelRadius={({ innerRadius }) => (innerRadius as number) + 30}
+                      style={{
+                        labels: {
+                          fill: 'white',
+                          fontSize: 14,
+                        },
+                      }}
+                      animate={{
+                        duration: 1000,
+                        easing: 'bounce',
+                      }}
+                    />
+                    <View style={styles.macroLegend}>
+                      {Object.entries(macroPercentages).map(([macro, percentage], index) => (
+                        <TouchableOpacity 
+                          key={macro} 
+                          style={styles.legendItem}
+                          onPress={() => setActiveTab('details')}
+                        >
+                          <View style={[styles.legendColor, { backgroundColor: [COLORS.protein[0], COLORS.carbs[0], COLORS.fat[0]][index] }]} />
+                          <View style={styles.legendTextContainer}>
+                            <Text style={styles.legendText}>
+                              {macro.charAt(0).toUpperCase() + macro.slice(1)}: {Math.round(percentage)}%
+                            </Text>
+                            <Text style={styles.legendSubtext}>
+                              {nutritionData[macro as keyof typeof nutritionData]}g / {goals?.[`daily_${macro}` as keyof typeof goals]}g
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                </LinearGradient>
+              </BlurView>
+            </Animated.View>
+
+            {/* Meals Logged */}
+            <MealsLoggedIndicator mealsLogged={dailyProgress.meals_logged} />
+          </>
+        );
+
+      case 'report':
+        return renderReportTab();
+      default:
         return (
           <>
             {/* Calories Overview */}
@@ -437,115 +694,10 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
             </Animated.View>
           </>
         );
-
-      case 'details':
-        return (
-          <Animated.View entering={FadeInDown} style={styles.nutrientDetails}>
-            <BlurView intensity={20} style={styles.cardBlur}>
-              <LinearGradient
-                colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
-                style={styles.cardGradient}
-              >
-                <Text style={styles.sectionTitle}>Nutrient Details</Text>
-                <View style={styles.nutrientGrid}>
-                  {Object.entries(nutritionData).map(([nutrient, amount]) => (
-                    <Animated.View 
-                      key={nutrient} 
-                      entering={FadeInDown.delay(200)} 
-                      style={styles.nutrientItem}
-                    >
-                      <Text style={styles.nutrientLabel}>
-                        {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
-                      </Text>
-                      <Text style={styles.nutrientValue}>{amount}g</Text>
-                      <View style={styles.nutrientProgress}>
-                        <LinearGradient
-                          colors={COLORS[nutrient as keyof typeof COLORS]}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={[
-                            styles.nutrientProgressBar,
-                            {
-                              width: `${(amount / (goals?.[`daily_${nutrient}` as keyof typeof goals] || 1)) * 100}%`
-                            }
-                          ]}
-                        />
-                      </View>
-                      <Text style={styles.nutrientTarget}>
-                        Target: {goals?.[`daily_${nutrient}` as keyof typeof goals]}g
-                      </Text>
-                    </Animated.View>
-                  ))}
-                </View>
-              </LinearGradient>
-            </BlurView>
-          </Animated.View>
-        );
-
-      case 'trends':
-        return (
-          <Animated.View entering={FadeInUp.delay(250)} style={styles.weeklyProgress}>
-            <BlurView intensity={20} style={styles.cardBlur}>
-              <LinearGradient
-                colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
-                style={styles.cardGradient}
-              >
-                <Text style={styles.sectionTitle}>Weekly Progress</Text>
-                <VictoryChart
-                  height={200}
-                  padding={{ top: 20, bottom: 40, left: 40, right: 20 }}
-                  domainPadding={{ x: 20 }}
-                >
-                  <VictoryAxis
-                    tickFormat={(t) => `Day ${t}`}
-                    style={{
-                      axis: { stroke: 'rgba(255, 255, 255, 0.3)' },
-                      tickLabels: { fill: 'rgba(255, 255, 255, 0.6)', fontSize: 10 },
-                    }}
-                  />
-                  <VictoryAxis
-                    dependentAxis
-                    tickFormat={(t) => `${t}%`}
-                    style={{
-                      axis: { stroke: 'rgba(255, 255, 255, 0.3)' },
-                      tickLabels: { fill: 'rgba(255, 255, 255, 0.6)', fontSize: 10 },
-                    }}
-                  />
-                  <VictoryBar
-                    data={[
-                      { x: 1, y: 80 },
-                      { x: 2, y: 90 },
-                      { x: 3, y: 85 },
-                      { x: 4, y: 95 },
-                      { x: 5, y: 88 },
-                      { x: 6, y: 92 },
-                      { x: 7, y: (nutritionData.calories / (goals?.daily_calories || 2000)) * 100 },
-                    ]}
-                    style={{
-                      data: {
-                        fill: ({ datum }) => {
-                          return datum.x === 7 ? COLORS.calories[0] : 'rgba(255,255,255,0.2)';
-                        },
-                      },
-                    }}
-                    animate={{
-                      duration: 500,
-                      onLoad: { duration: 500 },
-                    }}
-                    cornerRadius={5}
-                  />
-                </VictoryChart>
-              </LinearGradient>
-            </BlurView>
-          </Animated.View>
-        );
-
-      default:
-        return null;
     }
   };
 
-  if (isLoading) {
+  if (false) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.protein[0]} />
@@ -558,46 +710,22 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.tabContainer}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
-          onPress={() => setActiveTab('overview')}
+          style={[styles.tab, activeTab === 'progress' && styles.activeTab]}
+          onPress={() => setActiveTab('progress')}
         >
-          <Ionicons 
-            name="pie-chart-outline" 
-            size={24} 
-            color={activeTab === 'overview' ? COLORS.protein[0] : '#9CA3AF'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>
-            Overview
+          <Text style={[styles.tabText, activeTab === 'progress' && styles.activeTabText]}>
+            Progress
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'details' && styles.activeTab]}
-          onPress={() => setActiveTab('details')}
+          style={[styles.tab, activeTab === 'report' && styles.activeTab]}
+          onPress={() => setActiveTab('report')}
         >
-          <Ionicons 
-            name="list-outline" 
-            size={24} 
-            color={activeTab === 'details' ? COLORS.carbs[0] : '#9CA3AF'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'details' && styles.activeTabText]}>
-            Details
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'trends' && styles.activeTab]}
-          onPress={() => setActiveTab('trends')}
-        >
-          <Ionicons 
-            name="trending-up-outline" 
-            size={24} 
-            color={activeTab === 'trends' ? COLORS.fat[0] : '#9CA3AF'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'trends' && styles.activeTabText]}>
-            Trends
+          <Text style={[styles.tabText, activeTab === 'report' && styles.activeTabText]}>
+            Report
           </Text>
         </TouchableOpacity>
       </View>
-
       {renderTabContent()}
     </ScrollView>
   );
@@ -1170,22 +1298,158 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   tab: {
-    flexDirection: 'row',
+    flex: 1,
+    paddingVertical: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    borderRadius: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: '#E5E7EB',
   },
   activeTab: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomColor: '#4F46E5',
   },
   tabText: {
     fontSize: 14,
-    color: '#9CA3AF',
-    marginLeft: 8,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   activeTabText: {
+    color: '#4F46E5',
+  },
+  reportContainer: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  reportContent: {
+    flex: 1,
+  },
+  reportCard: {
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    borderRadius: 16,
+    padding: 20,
+    margin: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.3)',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  reportText: {
+    fontSize: 16,
+    color: '#1F2937',
+    lineHeight: 24,
+  },
+  generateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4F46E5',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 20,
+  },
+  generateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  mealsLoggedContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 24,
+  },
+  mealsLoggedTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     color: '#fff',
+    marginBottom: 16,
+  },
+  mealsLoggedCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mealsLoggedNumber: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  aiMainHeader: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginVertical: 12,
+    textShadowColor: 'rgba(99, 102, 241, 0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: 0.5,
+  },
+  aiNumberedHeader: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginTop: 24,
+    marginBottom: 16,
+    textShadowColor: 'rgba(99, 102, 241, 0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: 0.5,
+  },
+  aiListItemContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginVertical: 8,
+    paddingRight: 16,
+  },
+  aiBulletPoint: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#6366F1',
+    marginTop: 8,
+    marginRight: 12,
+    marginLeft: 8,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  aiListContent: {
+    flex: 1,
+  },
+  aiListItem: {
+    fontSize: 16,
+    color: '#F9FAFB',
+    marginVertical: 6,
+    lineHeight: 24,
+    letterSpacing: 0.3,
+  },
+  aiHighlightedText: {
+    color: '#818CF8',
+    fontWeight: '600',
+    textShadowColor: 'rgba(129, 140, 248, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  aiNormalText: {
+    color: '#F9FAFB',
+  },
+  aiRegularText: {
+    fontSize: 16,
+    color: '#F9FAFB',
+    marginVertical: 6,
+    lineHeight: 24,
+    letterSpacing: 0.3,
+  },
+  aiSpacer: {
+    height: 12,
   },
 });
 
