@@ -52,7 +52,19 @@ export default function HomeScreen() {
   }
 
   const handleAssistantPress = (id: string) => {
-    router.push('/(tabs)/aiassistant');
+    switch (id) {
+      case 'nutrition':
+        router.push('/(tabs)/nutritionanalyzer');
+        break;
+      case 'exercise':
+      case 'diet':
+      case 'mental':
+        // Temporarily route to AI assistant until these features are implemented
+        router.push('/(tabs)/aiassistant');
+        break;
+      default:
+        router.push('/(tabs)/aiassistant');
+    }
   };
 
   return (

@@ -829,7 +829,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                               ]}
                             />
                           </View>
-                          <View style={styles.nutrientDetails}>
+                          <View style={styles.nutrientDetailsCard}>
                             <Text style={styles.nutrientAmount}>
                               {nutritionData[nutrient as keyof typeof nutritionData]}g
                             </Text>
@@ -882,7 +882,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
       case 'trends':
         return (
           <ScrollView style={styles.trendsContainer}>
-            <Animated.View entering={FadeInDown.delay(100)} style={styles.trendsCard}>
+            <Animated.View entering={FadeInDown.delay(100)} style={styles.trendsCardContainer}>
               <BlurView intensity={20} style={styles.cardBlur}>
                 <LinearGradient
                   colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
@@ -924,19 +924,19 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                         }
                       }}
                       bezier
-                      style={styles.chart}
+                      style={styles.chartWrapper}
                     />
                   </View>
 
-                  <View style={styles.trendLegend}>
+                  <View style={styles.trendLegendContainer}>
                     {Object.entries({
                       Protein: COLORS.protein[0],
                       Carbs: COLORS.carbs[0],
                       Fats: COLORS.fat[0]
                     }).map(([nutrient, color]) => (
-                      <View key={nutrient} style={styles.legendItem}>
+                      <View key={nutrient} style={styles.legendItemWrapper}>
                         <View style={[styles.legendDot, { backgroundColor: color }]} />
-                        <Text style={styles.legendText}>{nutrient}</Text>
+                        <Text style={styles.legendTextStyle}>{nutrient}</Text>
                       </View>
                     ))}
                   </View>
@@ -945,7 +945,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
             </Animated.View>
 
             {/* Calorie Trend */}
-            <Animated.View entering={FadeInDown.delay(200)} style={styles.trendsCard}>
+            <Animated.View entering={FadeInDown.delay(200)} style={styles.trendsCardContainer}>
               <BlurView intensity={20} style={styles.cardBlur}>
                 <LinearGradient
                   colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
@@ -975,7 +975,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                         }
                       }}
                       bezier
-                      style={styles.chart}
+                      style={styles.chartWrapper}
                     />
                   </View>
                 </LinearGradient>
@@ -1412,7 +1412,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                             ]}
                           />
                         </View>
-                        <View style={styles.nutrientDetails}>
+                        <View style={styles.nutrientDetailsCard}>
                           <Text style={styles.nutrientAmount}>
                             {nutritionData[nutrient as keyof typeof nutritionData]}g
                           </Text>
@@ -1464,7 +1464,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
 
       {activeTab === 'trends' && (
         <ScrollView style={styles.trendsContainer}>
-          <Animated.View entering={FadeInDown.delay(100)} style={styles.trendsCard}>
+          <Animated.View entering={FadeInDown.delay(100)} style={styles.trendsCardContainer}>
             <BlurView intensity={20} style={styles.cardBlur}>
               <LinearGradient
                 colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
@@ -1506,19 +1506,19 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                       }
                     }}
                     bezier
-                    style={styles.chart}
+                    style={styles.chartWrapper}
                   />
                 </View>
 
-                <View style={styles.trendLegend}>
+                <View style={styles.trendLegendContainer}>
                   {Object.entries({
                     Protein: COLORS.protein[0],
                     Carbs: COLORS.carbs[0],
                     Fats: COLORS.fat[0]
                   }).map(([nutrient, color]) => (
-                    <View key={nutrient} style={styles.legendItem}>
+                    <View key={nutrient} style={styles.legendItemWrapper}>
                       <View style={[styles.legendDot, { backgroundColor: color }]} />
-                      <Text style={styles.legendText}>{nutrient}</Text>
+                      <Text style={styles.legendTextStyle}>{nutrient}</Text>
                     </View>
                   ))}
                 </View>
@@ -1527,7 +1527,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
           </Animated.View>
 
           {/* Calorie Trend */}
-          <Animated.View entering={FadeInDown.delay(200)} style={styles.trendsCard}>
+          <Animated.View entering={FadeInDown.delay(200)} style={styles.trendsCardContainer}>
             <BlurView intensity={20} style={styles.cardBlur}>
               <LinearGradient
                 colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
@@ -1557,7 +1557,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                       }
                     }}
                     bezier
-                    style={styles.chart}
+                    style={styles.chartWrapper}
                   />
                 </View>
               </LinearGradient>
@@ -2088,10 +2088,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 16,
   },
-  nutrientDetails: {
+  nutrientDetailsCard: {
     marginTop: 16,
     borderRadius: 16,
     overflow: 'hidden',
+  },
+  nutrientGridLayout: {
+    padding: 16,
   },
   nutrientGrid: {
     padding: 16,
@@ -2328,8 +2331,8 @@ const styles = StyleSheet.create({
   trendsContainer: {
     flex: 1,
   },
-  trendsCard: {
-    margin: 16,
+  trendsCardContainer: {
+    marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',
   },
@@ -2375,7 +2378,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  nutrientDetails: {
+  nutrientDetailsCard: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 4,
@@ -2663,21 +2666,21 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontSize: 14,
   },
-  trendsCard: {
+  trendsCardContainer: {
     marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',
   },
-  chart: {
+  chartWrapper: {
     marginVertical: 8,
     borderRadius: 16,
   },
-  trendLegend: {
+  trendLegendContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 16,
   },
-  legendItem: {
+  legendItemWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 12,
@@ -2688,7 +2691,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginRight: 8,
   },
-  legendText: {
+  legendTextStyle: {
     color: '#FFFFFF',
     fontSize: 14,
   }
@@ -2708,7 +2711,7 @@ const generateNutritionTips = (
 
   if (proteinPercentage < 50) {
     tips.push({
-      icon: 'warning-outline',
+      icon: 'warning' as keyof typeof Ionicons.glyphMap,
       color: '#FFB020',
       text: 'Your protein intake is low. Consider adding lean meats, eggs, or legumes to your meals.'
     });
@@ -2716,7 +2719,7 @@ const generateNutritionTips = (
 
   if (carbsPercentage > 90) {
     tips.push({
-      icon: 'checkmark-circle-outline',
+      icon: 'checkmark-circle' as keyof typeof Ionicons.glyphMap,
       color: '#14B8A6',
       text: 'Great job meeting your carb goals! Focus on complex carbs for sustained energy.'
     });
@@ -2724,7 +2727,7 @@ const generateNutritionTips = (
 
   if (fatPercentage > 100) {
     tips.push({
-      icon: 'information-circle-outline',
+      icon: 'information-circle' as keyof typeof Ionicons.glyphMap,
       color: '#6366F1',
       text: 'You\'ve exceeded your fat goal. Try to include more healthy fats like avocados and nuts.'
     });
@@ -2732,7 +2735,7 @@ const generateNutritionTips = (
 
   if (dailyProgress.meals_logged < 3) {
     tips.push({
-      icon: 'time-outline',
+      icon: 'time' as keyof typeof Ionicons.glyphMap,
       color: '#F59E0B',
       text: 'Regular meals help maintain energy levels. Try to log at least 3 meals per day.'
     });

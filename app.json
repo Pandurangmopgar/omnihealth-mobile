@@ -4,12 +4,12 @@
     "slug": "omnihealth-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.svg",
+    "icon": "./assets/images/icon.png",
     "scheme": "omnihealth-mobile",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#0B1120",
     "splash": {
-      "image": "./assets/images/splash.svg",
+      "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0B1120"
     },
@@ -22,14 +22,14 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.svg",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0B1120"
       },
       "package": "com.omnihealth.mobile"
     },
     "web": {
       "bundler": "metro",
-      "favicon": "./assets/images/icon.svg"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",

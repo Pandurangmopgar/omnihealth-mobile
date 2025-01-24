@@ -482,24 +482,15 @@ async function getDailyProgress(userId: string): Promise<{ progress: NutritionPr
     // Get today's progress from progress_tracking table
     const { data: progressData, error: progressError } = await supabase
       .from('progress_tracking')
-      .select(`
-        total_calories,
-        total_protein,
-        total_carbs,
-        total_fat,
-        meals_logged,
-        date
-      `)
+      .select('total_calories, total_protein, total_carbs, total_fat, meals_logged, date')
       .eq('user_id', userId)
       .eq('date', today)
-      .single();
+      .maybeSingle(); // Use maybeSingle instead of single to handle null case without error
 
     if (progressError) {
       console.error('[Progress] Error fetching progress:', progressError);
       throw progressError;
     }
-
-    console.log('[Progress] Retrieved progress data:', progressData);
 
     // Get user's goals
     const goals = await getDailyGoals(userId);
@@ -519,17 +510,10 @@ async function getDailyProgress(userId: string): Promise<{ progress: NutritionPr
       meals_logged: 0
     };
 
-    console.log('[Progress] Returning progress:', progress);
-    console.log('[Progress] Returning goals:', goals);
-
-    return {
-      progress,
-      goals
-    };
+    return { progress, goals };
 
   } catch (error) {
     console.error('[Progress] Error in getDailyProgress:', error);
-    // Return zeros for progress and default goals if there's an error
     return {
       progress: {
         calories: 0,
@@ -538,7 +522,7 @@ async function getDailyProgress(userId: string): Promise<{ progress: NutritionPr
         fat: 0,
         meals_logged: 0
       },
-      goals: getDefaultGoals()
+      goals: await getDefaultGoals()
     };
   }
 }
