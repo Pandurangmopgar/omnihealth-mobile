@@ -48,57 +48,60 @@ interface RedisHashData {
   [key: string]: string;
 }
 
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
+const MAX_NOTIFICATIONS_PER_WINDOW = 10;
+
 export async function registerForPushNotifications(userId: string) {
-  if (!Device.isDevice) {
-    throw new Error('Push Notifications are only supported on physical devices');
-  }
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync({
+        ios: {
+          allowAlert: true,
+          allowBadge: true,
+          allowSound: true,
+        },
+      });
+      finalStatus = status;
+    }
+    
+    if (finalStatus !== 'granted') {
+      throw new Error('Permission not granted for notifications');
+    }
 
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync({
-      ios: {
-        allowAlert: true,
-        allowBadge: true,
-        allowSound: true,
-      },
+    const expoPushToken = await Notifications.getExpoPushTokenAsync({
+      projectId: process.env.EXPO_PROJECT_ID!,
     });
-    finalStatus = status;
+
+    // Store token in Redis
+    const tokenData: NotificationToken = {
+      token: expoPushToken.data,
+      platform: Platform.OS === 'ios' ? 'ios' : 'android',
+      lastUpdated: new Date().toISOString(),
+    };
+
+    const hashData: RedisHashData = {
+      token: JSON.stringify(tokenData)
+    };
+    await redis.hset(`user:${userId}:notifications`, hashData);
+
+    // Configure for iOS
+    if (Platform.OS === 'ios') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
+
+    return expoPushToken.data;
+  } catch (error) {
+    console.error('Error registering for push notifications:', error);
+    throw error;
   }
-
-  if (finalStatus !== 'granted') {
-    throw new Error('Permission not granted for notifications');
-  }
-
-  // Get push token
-  const expoPushToken = await Notifications.getExpoPushTokenAsync({
-    projectId: process.env.EXPO_PROJECT_ID!,
-  });
-
-  // Store token in Redis
-  const tokenData: NotificationToken = {
-    token: expoPushToken.data,
-    platform: Platform.OS === 'ios' ? 'ios' : 'android',
-    lastUpdated: new Date().toISOString(),
-  };
-
-  const hashData: RedisHashData = {
-    token: JSON.stringify(tokenData)
-  };
-  await redis.hset(`user:${userId}:notifications`, hashData);
-
-  // Configure for iOS
-  if (Platform.OS === 'ios') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-    });
-  }
-
-  return expoPushToken.data;
 }
 
 async function generateNotificationContent(userId: string, mealType: string, progress: any) {
@@ -160,7 +163,7 @@ export async function scheduleNutritionReminders(userId: string) {
         content: {
           title: Platform.OS === 'ios' ? 'Nutrition Reminder 🍎' : 'Time to track your nutrition!',
           body: notificationContent,
-          data: { type: 'meal_reminder', mealType: reminder.mealType },
+          data: { type: 'meal_reminder', mealType: reminder.mealType, userId },
           sound: true,
           badge: 1,
           priority: AndroidNotificationPriority.MAX,
@@ -210,7 +213,7 @@ async function scheduleProgressNotifications(userId: string) {
       content: {
         title: Platform.OS === 'ios' ? 'Nutrition Progress Update 📊' : 'Check your nutrition progress!',
         body: notificationContent,
-        data: { type: 'progress_check' },
+        data: { type: 'progress_check', userId },
         sound: true,
         badge: 1,
         priority: AndroidNotificationPriority.HIGH,
@@ -287,6 +290,54 @@ export async function sendTestNotification() {
   } catch (error) {
     console.error('Error sending test notification:', error);
     throw error;
+  }
+}
+
+export async function handleNotification(notification: Notifications.Notification) {
+  const notificationId = notification.request.identifier;
+  
+  try {
+    // Check if notification was already handled
+    const wasHandled = await redis.get(`handled_notification:${notificationId}`);
+    if (wasHandled) {
+      return;
+    }
+
+    // Mark notification as handled
+    await redis.set(`handled_notification:${notificationId}`, true, { ex: 24 * 60 * 60 });
+
+    // Check rate limit
+    const userId = notification.request.content.data?.userId;
+    if (userId) {
+      const rateKey = `notification_rate:${userId}`;
+      const currentCount = await redis.incr(rateKey);
+      
+      // Set expiry on first increment
+      if (currentCount === 1) {
+        await redis.expire(rateKey, RATE_LIMIT_WINDOW / 1000);
+      }
+
+      if (currentCount > MAX_NOTIFICATIONS_PER_WINDOW) {
+        console.warn(`Rate limit exceeded for user ${userId}`);
+        return;
+      }
+    }
+
+    // Process notification
+    const data = notification.request.content.data;
+    
+    // Prevent infinite loops by checking notification type
+    if (data?.type === 'meal_reminder') {
+      // Handle meal reminder specific logic
+      console.log('Processing meal reminder:', data);
+      // Add your reminder-specific logic here
+    } else if (data?.type === 'progress_check') {
+      // Handle progress check tap
+      // Navigation logic will be handled by the app navigation system
+    }
+
+  } catch (error) {
+    console.error('Error handling notification:', error);
   }
 }
 

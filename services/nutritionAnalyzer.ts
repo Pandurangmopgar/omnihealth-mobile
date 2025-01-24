@@ -289,19 +289,14 @@ async function analyzeNutrition(
       throw new Error('User ID is required');
     }
 
-    let prompt = '';
-    if (type === 'text') {
-      prompt = `Analyze the nutritional content of: ${content}`;
-    } else {
-      prompt = `Analyze the nutritional content of this food image: ${content}`;
-    }
-
-    // Check cache first
-    const cacheKey = `nutrition_analysis:${type}:${content.substring(0, 100)}`;
+    // Generate a stable cache key
+    const cacheKey = `nutrition_analysis:${type}:${Buffer.from(content).toString('base64').slice(0, 50)}`;
+    
+    // Check cache first to reduce API calls
     try {
       const cachedResult = await redis.get(cacheKey);
       if (cachedResult) {
-        const analysis = JSON.parse(cachedResult);
+        const analysis = typeof cachedResult === 'string' ? JSON.parse(cachedResult) : cachedResult;
         const progress = await updateDailyProgress(userId, analysis.nutritional_content);
         return { analysis, progress };
       }
@@ -309,27 +304,63 @@ async function analyzeNutrition(
       console.warn('Cache retrieval failed:', error);
     }
 
-    // Generate content
-    const result = await model.generateContent([{ text: systemPrompt }, { text: prompt }]);
-    const response = await result.response;
-    const analysis = formatAIResponse(response.text());
+    // Prepare comprehensive prompt with all required fields
+    const prompt = `${systemPrompt}\n\nAnalyze this ${type} in detail, including:\n
+    1. Basic nutritional content
+    2. Micronutrient distribution
+    3. Health implications
+    4. Dietary recommendations
+    5. Meal timing suggestions\n\nContent: ${content}`;
 
-    // Update progress and store result
-    const progress = await updateDailyProgress(userId, analysis.nutritional_content);
-    await storeAnalysisResult(userId, analysis);
+    // Add retry logic with exponential backoff
+    let retries = 3;
+    let delay = 1000;
+    let analysis: NutritionAnalysis;
 
-    // Cache the result
+    while (retries > 0) {
+      try {
+        const result = await model.generateContent(prompt);
+        if (!result.response) {
+          throw new Error('Empty response from AI model');
+        }
+        const responseText = result.response.text();
+        if (!responseText) {
+          throw new Error('Empty text in AI response');
+        }
+        analysis = formatAIResponse(responseText);
+        break;
+      } catch (error) {
+        retries--;
+        if (retries === 0) throw error;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+      }
+    }
+
+    // Ensure all required fields are present
+    if (!analysis) {
+      throw new Error('Failed to generate analysis');
+    }
+
+    // Cache successful result
     try {
       await redis.set(cacheKey, JSON.stringify(analysis), { ex: CACHE_TTL });
     } catch (error) {
       console.warn('Cache storage failed:', error);
     }
 
+    // Update progress with comprehensive data
+    const progress = await updateDailyProgress(userId, analysis.nutritional_content);
+
+    // Store detailed analysis
+    await storeAnalysisResult(userId, analysis);
+
     return { analysis, progress };
   } catch (error) {
+    console.error('Nutrition analysis error:', error);
     throw new NutritionAnalysisError(error instanceof Error ? error.message : 'Failed to analyze nutrition');
   }
-};
+}
 
 async function generateNutritionReport(userId: string) {
   try {
@@ -608,17 +639,92 @@ async function checkNutritionGoals(userId: string): Promise<string> {
     Keep it encouraging and actionable. Maximum 2 sentences.`;
 
     const result = await model.generateContent(prompt);
-    return result.response.text();
+    const defaultMessage = 'No specific recommendations at this time';
+    return result.response.text() || defaultMessage;
   } catch (error) {
     console.error('Error checking nutrition goals:', error);
     return 'Remember to track your meals and stay on top of your nutrition goals!';
   }
 }
 
-export { 
-  analyzeNutrition, 
-  getDailyProgress, 
-  getDailyGoals, 
+export async function getWeeklyData(userId: string) {
+  try {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7);
+    
+    const { data: weeklyData, error } = await supabase
+      .from('progress_tracking')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('date', startDate.toISOString().split('T')[0])
+      .order('date', { ascending: true });
+
+    if (error) throw error;
+
+    const formattedData = {
+      protein: [] as { date: number; value: number }[],
+      carbs: [] as { date: number; value: number }[],
+      fats: [] as { date: number; value: number }[],
+      calories: [] as { date: number; value: number }[]
+    };
+
+    weeklyData?.forEach(day => {
+      const timestamp = new Date(day.date).getTime();
+      formattedData.protein.push({ date: timestamp, value: day.total_protein || 0 });
+      formattedData.carbs.push({ date: timestamp, value: day.total_carbs || 0 });
+      formattedData.fats.push({ date: timestamp, value: day.total_fat || 0 });
+      formattedData.calories.push({ date: timestamp, value: day.total_calories || 0 });
+    });
+
+    return formattedData;
+  } catch (error) {
+    console.error('Error fetching weekly data:', error);
+    throw error;
+  }
+}
+
+export async function scheduleNutritionReminders(userId: string, reminders: ReminderSettings[]): Promise<void> {
+  const MAX_REMINDERS = 5; // Maximum number of reminders per user
+  const MIN_INTERVAL = 60 * 60 * 1000; // Minimum 1 hour between reminders
+
+  try {
+    // Limit number of reminders
+    const limitedReminders = reminders.slice(0, MAX_REMINDERS);
+
+    // Sort reminders by time
+    const sortedReminders = limitedReminders.sort((a, b) => {
+      const timeA = a.time.hour * 60 + a.time.minute;
+      const timeB = b.time.hour * 60 + b.time.minute;
+      return timeA - timeB;
+    });
+
+    // Validate intervals between reminders
+    for (let i = 1; i < sortedReminders.length; i++) {
+      const prevTime = sortedReminders[i - 1].time;
+      const currTime = sortedReminders[i].time;
+      const prevMinutes = prevTime.hour * 60 + prevTime.minute;
+      const currMinutes = currTime.hour * 60 + currTime.minute;
+      
+      if ((currMinutes - prevMinutes) * 60 * 1000 < MIN_INTERVAL) {
+        throw new Error('Reminders must be at least 1 hour apart');
+      }
+    }
+
+    // Store reminders in Redis with expiration
+    const reminderKey = `reminders:${userId}`;
+    await redis.set(reminderKey, JSON.stringify(sortedReminders), { ex: 24 * 60 * 60 }); // Expire after 24 hours
+
+    return;
+  } catch (error) {
+    console.error('Error scheduling reminders:', error);
+    throw error;
+  }
+}
+
+export {
+  analyzeNutrition,
+  getDailyProgress,
+  getDailyGoals,
   getDefaultGoals,
   generateNutritionReport,
   calculateOptimalReminders,
