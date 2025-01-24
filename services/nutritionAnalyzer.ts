@@ -289,9 +289,29 @@ async function analyzeNutrition(
       throw new Error('User ID is required');
     }
 
-    // Generate a stable cache key
-    const cacheKey = `nutrition_analysis:${type}:${Buffer.from(content).toString('base64').slice(0, 50)}`;
-    
+    let prompt = '';
+    let parts = [];
+
+    if (type === 'text') {
+      prompt = `Analyze this food description: ${content}`;
+      parts = [{ text: systemPrompt }, { text: prompt }];
+    } else {
+      prompt = 'Analyze this food image and provide nutritional information.';
+      parts = [
+        { text: systemPrompt },
+        { text: prompt },
+        {
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: content
+          }
+        }
+      ];
+    }
+
+    // Check cache first
+    const cacheKey = `nutrition_analysis:${type}:${content.substring(0, 100)}`;
+
     // Check cache first to reduce API calls
     try {
       const cachedResult = await redis.get(cacheKey);
@@ -304,14 +324,6 @@ async function analyzeNutrition(
       console.warn('Cache retrieval failed:', error);
     }
 
-    // Prepare comprehensive prompt with all required fields
-    const prompt = `${systemPrompt}\n\nAnalyze this ${type} in detail, including:\n
-    1. Basic nutritional content
-    2. Micronutrient distribution
-    3. Health implications
-    4. Dietary recommendations
-    5. Meal timing suggestions\n\nContent: ${content}`;
-
     // Add retry logic with exponential backoff
     let retries = 3;
     let delay = 1000;
@@ -319,7 +331,7 @@ async function analyzeNutrition(
 
     while (retries > 0) {
       try {
-        const result = await model.generateContent(prompt);
+        const result = await model.generateContent(parts);
         if (!result.response) {
           throw new Error('Empty response from AI model');
         }
