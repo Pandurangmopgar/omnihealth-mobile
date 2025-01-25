@@ -9,6 +9,9 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -85,89 +88,103 @@ export const NutritionGoalsModal: React.FC<NutritionGoalsModalProps> = ({
       transparent={true}
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalContainer}
-      >
-        <View style={styles.modalContent}>
-          <LinearGradient
-            colors={['#0B1120', '#1A237E']}
-            style={styles.gradientContainer}
-          >
-            <View style={styles.header}>
-              <Text style={styles.title}>Set Nutrition Goals</Text>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Daily Calories</Text>
-                <TextInput
-                  style={styles.input}
-                  value={goals.calories}
-                  onChangeText={(text) => setGoals({ ...goals, calories: text })}
-                  keyboardType="numeric"
-                  placeholder="Enter calories"
-                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Daily Protein (g)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={goals.protein}
-                  onChangeText={(text) => setGoals({ ...goals, protein: text })}
-                  keyboardType="numeric"
-                  placeholder="Enter protein"
-                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Daily Carbs (g)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={goals.carbs}
-                  onChangeText={(text) => setGoals({ ...goals, carbs: text })}
-                  keyboardType="numeric"
-                  placeholder="Enter carbs"
-                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Daily Fat (g)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={goals.fat}
-                  onChangeText={(text) => setGoals({ ...goals, fat: text })}
-                  keyboardType="numeric"
-                  placeholder="Enter fat"
-                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                />
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
-              onPress={handleSave}
-              disabled={isLoading}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
+        >
+          <View style={styles.modalContent}>
+            <LinearGradient
+              colors={['#0B1120', '#1A237E']}
+              style={styles.gradientContainer}
             >
-              <LinearGradient
-                colors={['#4C6EF5', '#3D5AFE']}
-                style={styles.saveButtonGradient}
+              <View style={styles.header}>
+                <Text style={styles.title}>Set Nutrition Goals</Text>
+                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                  <Ionicons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView 
+                style={styles.scrollView}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
               >
-                <Text style={styles.saveButtonText}>
-                  {isLoading ? 'Saving...' : 'Save Goals'}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </LinearGradient>
-        </View>
-      </KeyboardAvoidingView>
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Daily Calories</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={goals.calories}
+                      onChangeText={(text) => setGoals({ ...goals, calories: text })}
+                      keyboardType="numeric"
+                      placeholder="Enter calories"
+                      placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                      returnKeyType="next"
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Daily Protein (g)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={goals.protein}
+                      onChangeText={(text) => setGoals({ ...goals, protein: text })}
+                      keyboardType="numeric"
+                      placeholder="Enter protein"
+                      placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                      returnKeyType="next"
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Daily Carbs (g)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={goals.carbs}
+                      onChangeText={(text) => setGoals({ ...goals, carbs: text })}
+                      keyboardType="numeric"
+                      placeholder="Enter carbs"
+                      placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                      returnKeyType="next"
+                    />
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Daily Fat (g)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={goals.fat}
+                      onChangeText={(text) => setGoals({ ...goals, fat: text })}
+                      keyboardType="numeric"
+                      placeholder="Enter fat"
+                      placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                      returnKeyType="done"
+                      onSubmitEditing={Keyboard.dismiss}
+                    />
+                  </View>
+                </View>
+              </ScrollView>
+
+              <TouchableOpacity
+                style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
+                onPress={handleSave}
+                disabled={isLoading}
+              >
+                <LinearGradient
+                  colors={['#4C6EF5', '#3D5AFE']}
+                  style={styles.saveButtonGradient}
+                >
+                  <Text style={styles.saveButtonText}>
+                    {isLoading ? 'Saving...' : 'Save Goals'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
@@ -194,6 +211,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    paddingTop: 10,
   },
   title: {
     fontSize: 24,
@@ -203,40 +221,47 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 8,
   },
+  scrollView: {
+    flex: 1,
+    marginBottom: 20,
+  },
   inputContainer: {
     flex: 1,
-    gap: 16,
+    gap: 20,
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 15,
   },
   label: {
     color: '#fff',
     fontSize: 16,
     marginBottom: 8,
+    fontWeight: '600',
   },
   input: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 10,
+    padding: 15,
     color: '#fff',
     fontSize: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   saveButton: {
-    marginTop: 20,
-    borderRadius: 8,
+    borderRadius: 10,
     overflow: 'hidden',
+    marginTop: 10,
   },
   saveButtonDisabled: {
     opacity: 0.7,
   },
   saveButtonGradient: {
-    padding: 16,
+    padding: 15,
     alignItems: 'center',
   },
   saveButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
 });
