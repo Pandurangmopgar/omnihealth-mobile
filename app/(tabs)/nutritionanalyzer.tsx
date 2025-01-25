@@ -67,18 +67,18 @@ interface NutritionResult {
       fats: { amount: number; unit: string; daily_value_percentage: number };
     };
     micronutrients: {
-      vitamins: {
+      vitamins: Array<{
         name: string;
         amount: number;
         unit: string;
         daily_value_percentage: number;
-      }[];
-      minerals: {
+      }>;
+      minerals: Array<{
         name: string;
         amount: number;
         unit: string;
         daily_value_percentage: number;
-      }[];
+      }>;
     };
   };
   health_analysis: {
@@ -819,9 +819,9 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                     <Text style={styles.nutrientSectionTitle}>Macronutrients</Text>
                     <View style={styles.nutrientList}>
                       {Object.entries({
-                        protein: { color: COLORS.protein[0], icon: 'fitness' },
-                        carbs: { color: COLORS.carbs[0], icon: 'leaf' },
-                        fat: { color: COLORS.fat[0], icon: 'water' }
+                        protein: { color: COLORS.protein[0], icon: 'fitness-outline' as const },
+                        carbs: { color: COLORS.carbs[0], icon: 'leaf-outline' as const },
+                        fat: { color: COLORS.fat[0], icon: 'water-outline' as const }
                       }).map(([nutrient, { color, icon }]) => (
                         <View key={nutrient} style={styles.nutrientDetailItem}>
                           <View style={styles.nutrientHeader}>
@@ -1402,9 +1402,9 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                   <Text style={styles.nutrientSectionTitle}>Macronutrients</Text>
                   <View style={styles.nutrientList}>
                     {Object.entries({
-                      protein: { color: COLORS.protein[0], icon: 'fitness' },
-                      carbs: { color: COLORS.carbs[0], icon: 'leaf' },
-                      fat: { color: COLORS.fat[0], icon: 'water' }
+                      protein: { color: COLORS.protein[0], icon: 'fitness-outline' as const },
+                      carbs: { color: COLORS.carbs[0], icon: 'leaf-outline' as const },
+                      fat: { color: COLORS.fat[0], icon: 'water-outline' as const }
                     }).map(([nutrient, { color, icon }]) => (
                       <View key={nutrient} style={styles.nutrientDetailItem}>
                         <View style={styles.nutrientHeader}>
@@ -1594,11 +1594,22 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
 
 const NutritionGoalsModal = ({ visible, onClose, onSave, initialGoals }: NutritionGoalsModalProps) => {
   const [goals, setGoals] = useState<UserGoalInput>({
-    calories: initialGoals?.calories?.toString() || '2000',
-    protein: initialGoals?.protein?.toString() || '100',
-    carbs: initialGoals?.carbs?.toString() || '225',
-    fat: initialGoals?.fat?.toString() || '65',
+    calories: '2000',
+    protein: '100',
+    carbs: '225',
+    fat: '65',
   });
+
+  useEffect(() => {
+    if (initialGoals) {
+      setGoals({
+        calories: initialGoals.daily_calories.toString(),
+        protein: initialGoals.daily_protein.toString(),
+        carbs: initialGoals.daily_carbs.toString(),
+        fat: initialGoals.daily_fat.toString(),
+      });
+    }
+  }, [initialGoals]);
 
   const handleSave = () => {
     // Validate inputs
@@ -1700,6 +1711,16 @@ const styles = StyleSheet.create({
   },
   gradient: {
     flex: 1,
+  },
+  chartContainer: {
+    padding: 15,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginBottom: 20,
+  },
+  chart: {
+    marginTop: 10,
+    alignItems: 'center',
   },
   header: {
     paddingHorizontal: 20,
@@ -1934,12 +1955,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#EF4444',
     marginTop: 4,
-  },
-  chartContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 24,
   },
   chartTitle: {
     fontSize: 18,
@@ -2879,6 +2894,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
+  mainContent: {
+    flex: 1,
+    width: '100%',
+  },
 });
 
 const generateNutritionTips = (
@@ -2961,6 +2980,7 @@ export default function NutritionAnalyzer() {
   }, [userId]);
 
   const loadUserGoals = async () => {
+    if (!userId) return; // Ensure userId is a string
     try {
       const goals = await fetchUserNutritionGoals(userId);
       if (goals) {
@@ -2972,6 +2992,7 @@ export default function NutritionAnalyzer() {
   };
 
   const handleSaveGoals = async (goals: UserGoalInput) => {
+    if (!userId) return; // Ensure userId is a string
     try {
       await updateUserNutritionGoals(userId, goals);
       await loadUserGoals(); // Reload goals after saving
@@ -2991,16 +3012,17 @@ export default function NutritionAnalyzer() {
 
   const debouncedAnalyzeText = useCallback(
     debounce(async (text: string) => {
-      if (!text.trim() || isLoading || !userId) return;
+      if (!text.trim() || isLoading || typeof userId !== 'string') return;
       
       try {
         setIsLoading(true);
         router.push('/(tabs)/nutritionanalyzer');
         const { analysis } = await analyzeNutrition('text', text, userId);
         setResult(analysis);
+        setShowDashboard(true);
       } catch (error) {
-        console.error('Error analyzing nutrition:', error);
-        Alert.alert('Error', 'Failed to analyze nutrition. Please try again.');
+        console.error('Error analyzing text:', error);
+        Alert.alert('Error', 'Failed to analyze text. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -3022,16 +3044,13 @@ export default function NutritionAnalyzer() {
   }, [debouncedAnalyzeText]);
 
   const handleImageAnalysis = async (imageUri: string) => {
-    if (!userId) {
-      Alert.alert('Error', 'Please sign in to analyze food.');
-      return;
-    }
+    if (!imageUri || isLoading || typeof userId !== 'string') return;
 
     try {
       setIsLoading(true);
-      router.push('/(tabs)/nutritionanalyzer');
       const { analysis } = await analyzeNutrition('image', imageUri, userId);
       setResult(analysis);
+      setShowDashboard(true);
     } catch (error) {
       console.error('Error analyzing image:', error);
       Alert.alert('Error', 'Failed to analyze image. Please try again.');
@@ -3117,7 +3136,7 @@ export default function NutritionAnalyzer() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </View> {/* Close the View tag here */}
 
         <ScrollView 
           style={styles.content}
@@ -3127,7 +3146,7 @@ export default function NutritionAnalyzer() {
           {showDashboard ? (
             <NutritionVisualization result={result} dailyProgress={dailyProgress} />
           ) : (
-            <>
+            <View style={styles.mainContent}>
               <View style={styles.inputSection}>
                 <View style={styles.imageInputs}>
                   <TouchableOpacity
@@ -3186,98 +3205,31 @@ export default function NutritionAnalyzer() {
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>
+
+                {image && (
+                  <MotiView
+                    from={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: 'timing', duration: 300 }}
+                    style={styles.imagePreview}
+                  >
+                    <Image source={{ uri: image }} style={styles.previewImage} />
+                  </MotiView>
+                )}
+
+                {isLoading && (
+                  <MotiView
+                    from={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: 'timing', duration: 300 }}
+                    style={styles.loadingContainer}
+                  >
+                    <ActivityIndicator size="large" color="#4C6EF5" />
+                    <Text style={styles.loadingText}>Analyzing nutrition...</Text>
+                  </MotiView>
+                )}
               </View>
-
-              {image && (
-                <MotiView
-                  from={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ type: 'timing', duration: 300 }}
-                  style={styles.imagePreview}
-                >
-                  <Image source={{ uri: image }} style={styles.previewImage} />
-                </MotiView>
-              )}
-
-              {isLoading && (
-                <MotiView
-                  from={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ type: 'timing', duration: 300 }}
-                  style={styles.loadingContainer}
-                >
-                  <ActivityIndicator size="large" color="#4C6EF5" />
-                  <Text style={styles.loadingText}>Analyzing nutrition...</Text>
-                </MotiView>
-              )}
-
-              {result && !showDashboard && (
-                <MotiView
-                  from={{ opacity: 0, translateY: 20 }}
-                  animate={{ opacity: 1, translateY: 0 }}
-                  transition={{ type: 'timing', duration: 300 }}
-                  style={styles.resultContainer}
-                >
-                  <View style={styles.resultHeader}>
-                    <View style={styles.resultTitleRow}>
-                      <Text style={styles.foodName}>{result.basic_info.food_name}</Text>
-                      <TouchableOpacity
-                        style={styles.closeButton}
-                        onPress={resetAnalysis}
-                      >
-                        <Ionicons name="close-circle" size={24} color="rgba(255, 255, 255, 0.7)" />
-                      </TouchableOpacity>
-                    </View>
-                    <Text style={styles.mealType}>
-                      <Ionicons name="time" size={16} color="#4C6EF5" /> {result.meal_type}
-                    </Text>
-                    {result.basic_info.portion_size && (
-                      <Text style={styles.portionSize}>
-                        <Ionicons name="restaurant" size={16} color="rgba(255, 255, 255, 0.7)" /> {result.basic_info.portion_size}
-                      </Text>
-                    )}
-                  </View>
-
-                  {result.health_analysis && (
-                    <View style={styles.healthAnalysis}>
-                      <Text style={styles.sectionTitle}>
-                        <Ionicons name="medical" size={20} color="#fff" /> Health Analysis
-                      </Text>
-                      {result.health_analysis.benefits.length > 0 && (
-                        <View style={styles.benefitsContainer}>
-                          <Text style={styles.benefitsTitle}>
-                            <Ionicons name="checkmark-circle" size={18} color="#4C6EF5" /> Benefits
-                          </Text>
-                          {result.health_analysis.benefits.map((benefit, index) => (
-                            <Text key={index} style={styles.benefitItem}>• {benefit}</Text>
-                          ))}
-                        </View>
-                      )}
-                      {result.health_analysis.considerations.length > 0 && (
-                        <View style={styles.considerationsContainer}>
-                          <Text style={styles.considerationsTitle}>
-                            <Ionicons name="information-circle" size={18} color="#4C6EF5" /> Considerations
-                          </Text>
-                          {result.health_analysis.considerations.map((consideration, index) => (
-                            <Text key={index} style={styles.considerationItem}>• {consideration}</Text>
-                          ))}
-                        </View>
-                      )}
-                      {result.health_analysis.allergens.length > 0 && (
-                        <View style={styles.allergensContainer}>
-                          <Text style={styles.allergensTitle}>
-                            <Ionicons name="alert-circle" size={18} color="#4C6EF5" /> Allergens
-                          </Text>
-                          {result.health_analysis.allergens.map((allergen, index) => (
-                            <Text key={index} style={styles.allergenItem}>• {allergen}</Text>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                  )}
-                </MotiView>
-              )}
-            </>
+            </View>
           )}
         </ScrollView>
       </LinearGradient>
@@ -3285,7 +3237,7 @@ export default function NutritionAnalyzer() {
         visible={showGoalsModal}
         onClose={() => setShowGoalsModal(false)}
         onSave={handleSaveGoals}
-        initialGoals={currentGoals || undefined}
+        initialGoals={currentGoals || undefined} // Handle null by providing undefined
       />
     </View>
   );

@@ -105,32 +105,73 @@ export async function registerForPushNotifications(userId: string) {
 }
 
 async function generateNotificationContent(userId: string, mealType: string, progress: any) {
-  const timeOfDay = new Date().getHours();
-  let context = '';
+  const hour = new Date().getHours();
+  let timeContext = '';
+  let mealContext = '';
 
-  if (timeOfDay < 12) {
-    context = 'morning';
-  } else if (timeOfDay < 17) {
-    context = 'afternoon';
+  // More precise time context
+  if (hour >= 5 && hour < 12) {
+    timeContext = 'morning';
+    mealContext = hour < 7 ? 'early breakfast' : 'breakfast';
+  } else if (hour >= 12 && hour < 17) {
+    timeContext = 'afternoon';
+    mealContext = hour < 14 ? 'lunch' : 'afternoon snack';
+  } else if (hour >= 17 && hour < 22) {
+    timeContext = 'evening';
+    mealContext = hour < 20 ? 'dinner' : 'evening snack';
   } else {
-    context = 'evening';
+    timeContext = 'night';
+    mealContext = 'late night';
+  }
+
+  // Check rate limiting
+  const rateKey = `user:${userId}:notification_rate`;
+  const currentCount = await redis.get(rateKey) as string;
+  const count = currentCount ? parseInt(currentCount) : 0;
+  
+  if (count >= MAX_NOTIFICATIONS_PER_WINDOW) {
+    console.log(`Rate limit exceeded for user ${userId}`);
+    return null;
+  }
+
+  // Increment rate limit counter
+  await redis.incr(rateKey);
+  if (count === 0) {
+    await redis.expire(rateKey, RATE_LIMIT_WINDOW / 1000); // Convert ms to seconds
   }
 
   const prompt = `Generate a friendly, motivational nutrition notification for a user. Use this context:
-  - Time of day: ${context}
-  - Meal type: ${mealType}
+  - Time of day: ${timeContext}
+  - Actual meal context: ${mealContext}
+  - Requested meal type: ${mealType}
   - Current progress: ${JSON.stringify(progress)}
   
   The message should be:
   1. Personal and encouraging
-  2. Reference their current progress
-  3. Include a specific tip or suggestion
-  4. Keep it under 100 characters
+  2. Time-appropriate (don't say good morning in the evening)
+  3. Reference their current progress if available
+  4. Include a specific tip or suggestion related to the time of day
+  5. Keep it under 100 characters
   
   Format: Return only the notification text, no quotes or formatting.`;
 
-  const result = await model.generateContent(prompt);
-  return result.response.text();
+  try {
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (error) {
+    console.error('Error generating notification content:', error);
+    return getDefaultMessage(timeContext, mealType);
+  }
+}
+
+function getDefaultMessage(timeContext: string, mealType: string): string {
+  const messages = {
+    morning: "Rise and shine! Time to plan your healthy breakfast. ",
+    afternoon: "Lunchtime! Remember to include colorful veggies in your meal. ",
+    evening: "Dinner planning time! Keep it light and nutritious. ",
+    night: "Planning tomorrow's meals? Don't forget to stay hydrated! "
+  };
+  return messages[timeContext as keyof typeof messages] || messages.morning;
 }
 
 export async function scheduleNutritionReminders(userId: string) {
@@ -153,6 +194,10 @@ export async function scheduleNutritionReminders(userId: string) {
         progress ? JSON.parse(progress) : null
       );
 
+      if (!notificationContent) {
+        continue;
+      }
+
       const trigger: DailyTriggerInput = {
         type: SchedulableTriggerInputTypes.DAILY,
         hour: reminder.time.hour,
@@ -161,7 +206,7 @@ export async function scheduleNutritionReminders(userId: string) {
 
       const identifier = await Notifications.scheduleNotificationAsync({
         content: {
-          title: Platform.OS === 'ios' ? 'Nutrition Reminder 🍎' : 'Time to track your nutrition!',
+          title: Platform.OS === 'ios' ? 'Nutrition Reminder ' : 'Time to track your nutrition!',
           body: notificationContent,
           data: { type: 'meal_reminder', mealType: reminder.mealType, userId },
           sound: true,
@@ -203,6 +248,10 @@ async function scheduleProgressNotifications(userId: string) {
       progress ? JSON.parse(progress) : null
     );
 
+    if (!notificationContent) {
+      continue;
+    }
+
     const trigger: DailyTriggerInput = {
       type: SchedulableTriggerInputTypes.DAILY,
       hour: time.hour,
@@ -211,7 +260,7 @@ async function scheduleProgressNotifications(userId: string) {
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: Platform.OS === 'ios' ? 'Nutrition Progress Update 📊' : 'Check your nutrition progress!',
+        title: Platform.OS === 'ios' ? 'Nutrition Progress Update ' : 'Check your nutrition progress!',
         body: notificationContent,
         data: { type: 'progress_check', userId },
         sound: true,
@@ -276,7 +325,7 @@ export async function sendTestNotification() {
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: Platform.OS === 'ios' ? 'Welcome to OmniHealth! 🎉' : 'Welcome to OmniHealth!',
+        title: Platform.OS === 'ios' ? 'Welcome to OmniHealth! ' : 'Welcome to OmniHealth!',
         body: `App opened at ${formattedTime}. Notifications are working correctly!`,
         data: { type: 'test_notification' },
         sound: true,
