@@ -664,7 +664,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                           />
                         </View>
                         <Text style={styles.macroText}>
-                          {nutritionData[nutrient as keyof NutritionData]}g / {goals ? goals[`daily_${nutrient}` as keyof NutritionGoals] : 0}g
+                          {Math.round(nutritionData[nutrient as keyof NutritionData])}g / {goals ? goals[`daily_${nutrient}` as keyof NutritionGoals] : 0}g
                         </Text>
                       </View>
                     ))}
@@ -852,7 +852,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                           </View>
                           <View style={styles.nutrientDetailsCard}>
                             <Text style={styles.nutrientAmount}>
-                              {nutritionData[nutrient as keyof NutritionData]}g
+                              {Math.round(nutritionData[nutrient as keyof NutritionData])}g
                             </Text>
                             <Text style={styles.nutrientGoal}>
                               of {goals?.[`daily_${nutrient}` as keyof NutritionGoals]}g goal
@@ -1084,7 +1084,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                           />
                         </View>
                         <Text style={styles.macroText}>
-                          {nutritionData[nutrient as keyof NutritionData]}g / {goals ? goals[`daily_${nutrient}` as keyof NutritionGoals] : 0}g
+                          {Math.round(nutritionData[nutrient as keyof NutritionData])}g / {goals ? goals[`daily_${nutrient}` as keyof NutritionGoals] : 0}g
                         </Text>
                       </View>
                     ))}
@@ -1248,7 +1248,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                         />
                       </View>
                       <Text style={styles.macroText}>
-                        {nutritionData[nutrient as keyof NutritionData]}g / {goals ? goals[`daily_${nutrient}` as keyof NutritionGoals] : 0}g
+                        {Math.round(nutritionData[nutrient as keyof NutritionData])}g / {goals ? goals[`daily_${nutrient}` as keyof NutritionGoals] : 0}g
                       </Text>
                     </View>
                   ))}
@@ -1435,7 +1435,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                         </View>
                         <View style={styles.nutrientDetailsCard}>
                           <Text style={styles.nutrientAmount}>
-                            {nutritionData[nutrient as keyof NutritionData]}g
+                            {Math.round(nutritionData[nutrient as keyof NutritionData])}g
                           </Text>
                           <Text style={styles.nutrientGoal}>
                             of {goals?.[`daily_${nutrient}` as keyof NutritionGoals]}g goal
