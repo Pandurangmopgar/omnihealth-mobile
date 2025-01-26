@@ -33,13 +33,7 @@ const HEALTH_ASSISTANTS = [
     icon: 'restaurant',
     gradient: ['#fbbf24', '#f59e0b'],
   },
-  {
-    id: 'mental',
-    title: 'Mental Wellness',
-    description: 'Support and guidance for mental health, stress management, and mindfulness.',
-    icon: 'brain',
-    gradient: ['#c084fc', '#a855f7'],
-  }
+  
 ];
 
 export default function HomeScreen() {

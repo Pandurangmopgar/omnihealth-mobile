@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { MotiView } from 'moti';
 import { useAuth } from '@clerk/clerk-expo';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { analyzeNutrition, getDailyProgress, getDailyGoals, generateNutritionReport, getWeeklyData } from '../../services/nutritionAnalyzer';
 import { registerForPushNotifications, scheduleNutritionReminders } from '../../services/pushNotifications';
 import { PieChart, LineChart } from 'react-native-chart-kit';
@@ -18,7 +17,6 @@ import { BlurView } from 'expo-blur';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import debounce from 'lodash/debounce';
 import { NutritionGoalsModal as GoalsModalComponent } from '../../components/NutritionGoalsModal';
-import { NutritionAnalyzerOnboarding } from '../../components/NutritionAnalyzerOnboarding';
 import { 
   fetchUserNutritionGoals, 
   updateUserNutritionGoals, 
@@ -69,18 +67,18 @@ interface NutritionResult {
       fats: { amount: number; unit: string; daily_value_percentage: number };
     };
     micronutrients: {
-      vitamins: Array<{
+      vitamins: {
         name: string;
         amount: number;
         unit: string;
         daily_value_percentage: number;
-      }>;
-      minerals: Array<{
+      }[];
+      minerals: {
         name: string;
         amount: number;
         unit: string;
         daily_value_percentage: number;
-      }>;
+      }[];
     };
   };
   health_analysis: {
@@ -229,7 +227,7 @@ const NutrientCard = ({ title, current, target, unit, colors, icon }: NutrientCa
       >
         <View style={styles.nutrientCardHeader}>
           <View style={styles.nutrientCardIcon}>
-            <Ionicons name={icon} size={24} color={colors[0]} />
+            <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={colors[0]} />
           </View>
           <Text style={styles.nutrientCardTitle}>{title}</Text>
         </View>
@@ -355,7 +353,7 @@ const MacroCard = ({ title, current, target, unit, icon, colors }: {
           style={styles.cardGradient}
         >
           <View style={styles.cardHeader}>
-            <Ionicons name={icon} size={24} color={colors[0]} />
+            <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={colors[0]} />
             <Text style={styles.cardTitle}>{title}</Text>
           </View>
           <View style={styles.cardContent}>
@@ -633,21 +631,21 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                   <View style={styles.macroSection}>
                     <Text style={styles.macroTitle}>Macronutrients</Text>
                     {Object.entries({
-                      protein: { color: COLORS.protein[0], icon: 'barbell-outline' as const },
-                      carbs: { color: COLORS.carbs[0], icon: 'leaf-outline' as const },
-                      fat: { color: COLORS.fat[0], icon: 'water-outline' as const }
+                      protein: { color: COLORS.protein[0], icon: 'barbell' as const },
+                      carbs: { color: COLORS.carbs[0], icon: 'leaf' as const },
+                      fat: { color: COLORS.fat[0], icon: 'water' as const }
                     }).map(([nutrient, { color, icon }]) => (
                       <View key={nutrient} style={styles.macroItem}>
                         <View style={styles.macroHeader}>
                           <View style={styles.macroIconContainer}>
-                            <Ionicons name={icon} size={20} color={color} />
+                            <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={color} />
                           </View>
                           <Text style={styles.macroName}>
                             {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
                           </Text>
                           <Text style={[styles.macroPercentage, { color }]}>
                             {goals ? Math.round((nutritionData[nutrient as keyof NutritionData] / 
-                              goals[`daily_${nutrient}` as keyof UserNutritionGoals]) * 100) : 0}%
+                              goals[`daily_${nutrient}` as keyof NutritionGoals]) * 100) : 0}%
                           </Text>
                         </View>
                         <View style={styles.macroProgressBar}>
@@ -660,13 +658,13 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                               {
                                 width: goals ? 
                                   `${Math.min((nutritionData[nutrient as keyof NutritionData] / 
-                                  goals[`daily_${nutrient}` as keyof UserNutritionGoals]) * 100, 100)}%` : '0%'
+                                  goals[`daily_${nutrient}` as keyof NutritionGoals]) * 100, 100)}%` : '0%'
                               }
                             ]}
                           />
                         </View>
                         <Text style={styles.macroText}>
-                          {nutritionData[nutrient as keyof NutritionData]}g / {goals ? goals[`daily_${nutrient}` as keyof UserNutritionGoals] : 0}g
+                          {nutritionData[nutrient as keyof NutritionData]}g / {goals ? goals[`daily_${nutrient}` as keyof NutritionGoals] : 0}g
                         </Text>
                       </View>
                     ))}
@@ -695,7 +693,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                   <View style={styles.tipsList}>
                     {generateNutritionTips(nutritionData, goals, dailyProgress).map((tip, index) => (
                       <View key={index} style={styles.tipItem}>
-                        <Ionicons name={tip.icon} size={20} color={tip.color} />
+                        <Ionicons name={tip.icon as keyof typeof Ionicons.glyphMap} size={20} color={tip.color} />
                         <Text style={styles.tipText}>{tip.text}</Text>
                       </View>
                     ))}
@@ -821,21 +819,21 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                     <Text style={styles.nutrientSectionTitle}>Macronutrients</Text>
                     <View style={styles.nutrientList}>
                       {Object.entries({
-                        protein: { color: COLORS.protein[0], icon: 'fitness-outline' as const },
-                        carbs: { color: COLORS.carbs[0], icon: 'leaf-outline' as const },
-                        fat: { color: COLORS.fat[0], icon: 'water-outline' as const }
+                        protein: { color: COLORS.protein[0], icon: 'fitness' },
+                        carbs: { color: COLORS.carbs[0], icon: 'leaf' },
+                        fat: { color: COLORS.fat[0], icon: 'water' }
                       }).map(([nutrient, { color, icon }]) => (
                         <View key={nutrient} style={styles.nutrientDetailItem}>
                           <View style={styles.nutrientHeader}>
                             <View style={styles.nutrientIconContainer}>
-                              <Ionicons name={icon} size={20} color={color} />
+                              <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={color} />
                             </View>
                             <Text style={styles.nutrientName}>
                               {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
                             </Text>
                             <Text style={[styles.nutrientPercentage, { color }]}>
-                              {Math.round((nutritionData[nutrient as keyof typeof nutritionData] / 
-                                (goals?.[`daily_${nutrient}` as keyof UserNutritionGoals] || 1)) * 100)}%
+                              {Math.round((nutritionData[nutrient as keyof NutritionData] / 
+                                (goals?.[`daily_${nutrient}` as keyof NutritionGoals] || 1)) * 100)}%
                             </Text>
                           </View>
                           <View style={styles.nutrientProgress}>
@@ -846,18 +844,18 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                               style={[
                                 styles.progressBar,
                                 {
-                                  width: `${(nutritionData[nutrient as keyof typeof nutritionData] / 
-                                    (goals?.[`daily_${nutrient}` as keyof UserNutritionGoals] || 1)) * 100}%`
+                                  width: `${(nutritionData[nutrient as keyof NutritionData] / 
+                                    (goals?.[`daily_${nutrient}` as keyof NutritionGoals] || 1)) * 100}%`
                                 }
                               ]}
                             />
                           </View>
                           <View style={styles.nutrientDetailsCard}>
                             <Text style={styles.nutrientAmount}>
-                              {nutritionData[nutrient as keyof typeof nutritionData]}g
+                              {nutritionData[nutrient as keyof NutritionData]}g
                             </Text>
                             <Text style={styles.nutrientGoal}>
-                              of {goals?.[`daily_${nutrient}` as keyof UserNutritionGoals]}g goal
+                              of {goals?.[`daily_${nutrient}` as keyof NutritionGoals]}g goal
                             </Text>
                           </View>
                         </View>
@@ -890,7 +888,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                     <View style={styles.tipsList}>
                       {generateNutritionTips(nutritionData, goals, dailyProgress).map((tip, index) => (
                         <View key={index} style={styles.tipItem}>
-                          <Ionicons name={tip.icon} size={20} color={tip.color} />
+                          <Ionicons name={tip.icon as keyof typeof Ionicons.glyphMap} size={20} color={tip.color} />
                           <Text style={styles.tipText}>{tip.text}</Text>
                         </View>
                       ))}
@@ -1053,21 +1051,21 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                   <View style={styles.macroSection}>
                     <Text style={styles.macroTitle}>Macronutrients</Text>
                     {Object.entries({
-                      protein: { color: COLORS.protein[0], icon: 'barbell-outline' as const },
-                      carbs: { color: COLORS.carbs[0], icon: 'leaf-outline' as const },
-                      fat: { color: COLORS.fat[0], icon: 'water-outline' as const }
+                      protein: { color: COLORS.protein[0], icon: 'barbell' as const },
+                      carbs: { color: COLORS.carbs[0], icon: 'leaf' as const },
+                      fat: { color: COLORS.fat[0], icon: 'water' as const }
                     }).map(([nutrient, { color, icon }]) => (
                       <View key={nutrient} style={styles.macroItem}>
                         <View style={styles.macroHeader}>
                           <View style={styles.macroIconContainer}>
-                            <Ionicons name={icon} size={20} color={color} />
+                            <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={color} />
                           </View>
                           <Text style={styles.macroName}>
                             {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
                           </Text>
                           <Text style={[styles.macroPercentage, { color }]}>
                             {goals ? Math.round((nutritionData[nutrient as keyof NutritionData] / 
-                              goals[`daily_${nutrient}` as keyof UserNutritionGoals]) * 100) : 0}%
+                              goals[`daily_${nutrient}` as keyof NutritionGoals]) * 100) : 0}%
                           </Text>
                         </View>
                         <View style={styles.macroProgressBar}>
@@ -1080,13 +1078,13 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                               {
                                 width: goals ? 
                                   `${Math.min((nutritionData[nutrient as keyof NutritionData] / 
-                                  goals[`daily_${nutrient}` as keyof UserNutritionGoals]) * 100, 100)}%` : '0%'
+                                  goals[`daily_${nutrient}` as keyof NutritionGoals]) * 100, 100)}%` : '0%'
                               }
                             ]}
                           />
                         </View>
                         <Text style={styles.macroText}>
-                          {nutritionData[nutrient as keyof NutritionData]}g / {goals ? goals[`daily_${nutrient}` as keyof UserNutritionGoals] : 0}g
+                          {nutritionData[nutrient as keyof NutritionData]}g / {goals ? goals[`daily_${nutrient}` as keyof NutritionGoals] : 0}g
                         </Text>
                       </View>
                     ))}
@@ -1115,7 +1113,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                   <View style={styles.tipsList}>
                     {generateNutritionTips(nutritionData, goals, dailyProgress).map((tip, index) => (
                       <View key={index} style={styles.tipItem}>
-                        <Ionicons name={tip.icon} size={20} color={tip.color} />
+                        <Ionicons name={tip.icon as keyof typeof Ionicons.glyphMap} size={20} color={tip.color} />
                         <Text style={styles.tipText}>{tip.text}</Text>
                       </View>
                     ))}
@@ -1217,21 +1215,21 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                 <View style={styles.macroSection}>
                   <Text style={styles.macroTitle}>Macronutrients</Text>
                   {Object.entries({
-                    protein: { color: COLORS.protein[0], icon: 'barbell-outline' as const },
-                    carbs: { color: COLORS.carbs[0], icon: 'leaf-outline' as const },
-                    fat: { color: COLORS.fat[0], icon: 'water-outline' as const }
+                    protein: { color: COLORS.protein[0], icon: 'barbell' as const },
+                    carbs: { color: COLORS.carbs[0], icon: 'leaf' as const },
+                    fat: { color: COLORS.fat[0], icon: 'water' as const }
                   }).map(([nutrient, { color, icon }]) => (
                     <View key={nutrient} style={styles.macroItem}>
                       <View style={styles.macroHeader}>
                         <View style={styles.macroIconContainer}>
-                          <Ionicons name={icon} size={20} color={color} />
+                          <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={color} />
                         </View>
                         <Text style={styles.macroName}>
                           {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
                         </Text>
                         <Text style={[styles.macroPercentage, { color }]}>
                           {goals ? Math.round((nutritionData[nutrient as keyof NutritionData] / 
-                            goals[`daily_${nutrient}` as keyof UserNutritionGoals]) * 100) : 0}%
+                            goals[`daily_${nutrient}` as keyof NutritionGoals]) * 100) : 0}%
                         </Text>
                       </View>
                       <View style={styles.macroProgressBar}>
@@ -1244,13 +1242,13 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                             {
                               width: goals ? 
                                 `${Math.min((nutritionData[nutrient as keyof NutritionData] / 
-                                goals[`daily_${nutrient}` as keyof UserNutritionGoals]) * 100, 100)}%` : '0%'
+                                goals[`daily_${nutrient}` as keyof NutritionGoals]) * 100, 100)}%` : '0%'
                             }
                           ]}
                         />
                       </View>
                       <Text style={styles.macroText}>
-                        {nutritionData[nutrient as keyof NutritionData]}g / {goals ? goals[`daily_${nutrient}` as keyof UserNutritionGoals] : 0}g
+                        {nutritionData[nutrient as keyof NutritionData]}g / {goals ? goals[`daily_${nutrient}` as keyof NutritionGoals] : 0}g
                       </Text>
                     </View>
                   ))}
@@ -1279,7 +1277,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                 <View style={styles.tipsList}>
                   {generateNutritionTips(nutritionData, goals, dailyProgress).map((tip, index) => (
                     <View key={index} style={styles.tipItem}>
-                      <Ionicons name={tip.icon} size={20} color={tip.color} />
+                      <Ionicons name={tip.icon as keyof typeof Ionicons.glyphMap} size={20} color={tip.color} />
                       <Text style={styles.tipText}>{tip.text}</Text>
                     </View>
                   ))}
@@ -1404,21 +1402,21 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                   <Text style={styles.nutrientSectionTitle}>Macronutrients</Text>
                   <View style={styles.nutrientList}>
                     {Object.entries({
-                      protein: { color: COLORS.protein[0], icon: 'fitness-outline' as const },
-                      carbs: { color: COLORS.carbs[0], icon: 'leaf-outline' as const },
-                      fat: { color: COLORS.fat[0], icon: 'water-outline' as const }
+                      protein: { color: COLORS.protein[0], icon: 'fitness' },
+                      carbs: { color: COLORS.carbs[0], icon: 'leaf' },
+                      fat: { color: COLORS.fat[0], icon: 'water' }
                     }).map(([nutrient, { color, icon }]) => (
                       <View key={nutrient} style={styles.nutrientDetailItem}>
                         <View style={styles.nutrientHeader}>
                           <View style={styles.nutrientIconContainer}>
-                            <Ionicons name={icon} size={20} color={color} />
+                            <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={color} />
                           </View>
                           <Text style={styles.nutrientName}>
                             {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
                           </Text>
                           <Text style={[styles.nutrientPercentage, { color }]}>
-                            {Math.round((nutritionData[nutrient as keyof typeof nutritionData] / 
-                              (goals?.[`daily_${nutrient}` as keyof UserNutritionGoals] || 1)) * 100)}%
+                            {Math.round((nutritionData[nutrient as keyof NutritionData] / 
+                              (goals?.[`daily_${nutrient}` as keyof NutritionGoals] || 1)) * 100)}%
                           </Text>
                         </View>
                         <View style={styles.nutrientProgress}>
@@ -1429,18 +1427,18 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                             style={[
                               styles.progressBar,
                               {
-                                width: `${(nutritionData[nutrient as keyof typeof nutritionData] / 
-                                  (goals?.[`daily_${nutrient}` as keyof UserNutritionGoals] || 1)) * 100}%`
+                                width: `${(nutritionData[nutrient as keyof NutritionData] / 
+                                  (goals?.[`daily_${nutrient}` as keyof NutritionGoals] || 1)) * 100}%`
                               }
                             ]}
                           />
                         </View>
                         <View style={styles.nutrientDetailsCard}>
                           <Text style={styles.nutrientAmount}>
-                            {nutritionData[nutrient as keyof typeof nutritionData]}g
+                            {nutritionData[nutrient as keyof NutritionData]}g
                           </Text>
                           <Text style={styles.nutrientGoal}>
-                            of {goals?.[`daily_${nutrient}` as keyof UserNutritionGoals]}g goal
+                            of {goals?.[`daily_${nutrient}` as keyof NutritionGoals]}g goal
                           </Text>
                         </View>
                       </View>
@@ -1473,7 +1471,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                   <View style={styles.tipsList}>
                     {generateNutritionTips(nutritionData, goals, dailyProgress).map((tip, index) => (
                       <View key={index} style={styles.tipItem}>
-                        <Ionicons name={tip.icon} size={20} color={tip.color} />
+                        <Ionicons name={tip.icon as keyof typeof Ionicons.glyphMap} size={20} color={tip.color} />
                         <Text style={styles.tipText}>{tip.text}</Text>
                       </View>
                     ))}
@@ -1595,27 +1593,16 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
 };
 
 const NutritionGoalsModal = ({ visible, onClose, onSave, initialGoals }: NutritionGoalsModalProps) => {
-  const [goals, setGoals] = useState<UserGoalInput>({
-    calories: '2000',
-    protein: '100',
-    carbs: '225',
-    fat: '65',
+  const [goalInput, setGoalInput] = useState<NutritionGoalInput>({
+    calories: initialGoals?.daily_calories?.toString() || '2000',
+    protein: initialGoals?.daily_protein?.toString() || '100',
+    carbs: initialGoals?.daily_carbs?.toString() || '225',
+    fat: initialGoals?.daily_fat?.toString() || '65',
   });
-
-  useEffect(() => {
-    if (initialGoals) {
-      setGoals({
-        calories: initialGoals.daily_calories.toString(),
-        protein: initialGoals.daily_protein.toString(),
-        carbs: initialGoals.daily_carbs.toString(),
-        fat: initialGoals.daily_fat.toString(),
-      });
-    }
-  }, [initialGoals]);
 
   const handleSave = () => {
     // Validate inputs
-    const values = Object.values(goals);
+    const values = Object.values(goalInput);
     for (const value of values) {
       const num = Number(value);
       if (isNaN(num) || num <= 0) {
@@ -1623,7 +1610,7 @@ const NutritionGoalsModal = ({ visible, onClose, onSave, initialGoals }: Nutriti
         return;
       }
     }
-    onSave(goals);
+    onSave(goalInput);
   };
 
   return (
@@ -1647,8 +1634,8 @@ const NutritionGoalsModal = ({ visible, onClose, onSave, initialGoals }: Nutriti
             <TextInput
               style={styles.input}
               keyboardType="numeric"
-              value={goals.calories}
-              onChangeText={(text) => setGoals(prev => ({ ...prev, calories: text }))}
+              value={goalInput.calories}
+              onChangeText={(text) => setGoalInput(prev => ({ ...prev, calories: text }))}
               placeholder="e.g., 2000"
               placeholderTextColor="rgba(255, 255, 255, 0.5)"
             />
@@ -1659,8 +1646,8 @@ const NutritionGoalsModal = ({ visible, onClose, onSave, initialGoals }: Nutriti
             <TextInput
               style={styles.input}
               keyboardType="numeric"
-              value={goals.protein}
-              onChangeText={(text) => setGoals(prev => ({ ...prev, protein: text }))}
+              value={goalInput.protein}
+              onChangeText={(text) => setGoalInput(prev => ({ ...prev, protein: text }))}
               placeholder="e.g., 100"
               placeholderTextColor="rgba(255, 255, 255, 0.5)"
             />
@@ -1671,8 +1658,8 @@ const NutritionGoalsModal = ({ visible, onClose, onSave, initialGoals }: Nutriti
             <TextInput
               style={styles.input}
               keyboardType="numeric"
-              value={goals.carbs}
-              onChangeText={(text) => setGoals(prev => ({ ...prev, carbs: text }))}
+              value={goalInput.carbs}
+              onChangeText={(text) => setGoalInput(prev => ({ ...prev, carbs: text }))}
               placeholder="e.g., 225"
               placeholderTextColor="rgba(255, 255, 255, 0.5)"
             />
@@ -1683,8 +1670,8 @@ const NutritionGoalsModal = ({ visible, onClose, onSave, initialGoals }: Nutriti
             <TextInput
               style={styles.input}
               keyboardType="numeric"
-              value={goals.fat}
-              onChangeText={(text) => setGoals(prev => ({ ...prev, fat: text }))}
+              value={goalInput.fat}
+              onChangeText={(text) => setGoalInput(prev => ({ ...prev, fat: text }))}
               placeholder="e.g., 65"
               placeholderTextColor="rgba(255, 255, 255, 0.5)"
             />
@@ -1713,16 +1700,6 @@ const styles = StyleSheet.create({
   },
   gradient: {
     flex: 1,
-  },
-  chartContainer: {
-    padding: 15,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    marginBottom: 20,
-  },
-  chart: {
-    marginTop: 10,
-    alignItems: 'center',
   },
   header: {
     paddingHorizontal: 20,
@@ -1957,6 +1934,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#EF4444',
     marginTop: 4,
+  },
+  chartContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 24,
   },
   chartTitle: {
     fontSize: 18,
@@ -2468,22 +2451,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     overflow: 'hidden',
   },
-  nutrientProgressBar: {
-    height: '100%',
-    backgroundColor: '#14B8A6',
-    borderRadius: 2,
-  },
-  nutrientTarget: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 12,
-  },
-  legendTextContainer: {
-    flex: 1,
-  },
-  legendSubtext: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 12,
-  },
   trendsContainer: {
     flex: 1,
   },
@@ -2912,9 +2879,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
-  mainContent: {
-    flex: 1,
-    width: '100%',
+  chart: {
+    // Define your chart style here
+    marginVertical: 8,
+    borderRadius: 16,
   },
 });
 
@@ -2974,7 +2942,6 @@ export default function NutritionAnalyzer() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<NutritionResult | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [dailyProgress, setDailyProgress] = useState<NutritionProgress>({
     calories: 0,
     protein: 0,
@@ -2991,54 +2958,55 @@ export default function NutritionAnalyzer() {
   const [showGoalsModal, setShowGoalsModal] = useState(false);
   const [currentGoals, setCurrentGoals] = useState<UserNutritionGoals | null>(null);
 
-  // Check if onboarding should be shown
+  // Fetch daily progress and goals
+  const fetchDailyProgress = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const { progress, goals } = await getDailyProgress(userId);
+      console.log('Fetched daily progress:', progress);
+      setDailyProgress(progress);
+      setCurrentGoals(goals);
+    } catch (error) {
+      console.error('Error fetching daily progress:', error);
+    }
+  }, [userId]);
+
+  // Fetch weekly data
+  const fetchWeeklyData = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const data = await getWeeklyData(userId);
+      setWeeklyData(data);
+    } catch (error) {
+      console.error('Error fetching weekly data:', error);
+    }
+  }, [userId]);
+
+  // Initial data load
   useEffect(() => {
-    const checkOnboardingStatus = async () => {
-      try {
-        const hasSeenOnboarding = await AsyncStorage.getItem('nutrition_analyzer_onboarding_seen');
-        if (!hasSeenOnboarding) {
-          setShowOnboarding(true);
-        }
-      } catch (error) {
-        console.error('Error checking onboarding status:', error);
-      }
-    };
-    checkOnboardingStatus();
-  }, []);
-
-  const handleOnboardingClose = async () => {
-    try {
-      await AsyncStorage.setItem('nutrition_analyzer_onboarding_seen', 'true');
-      setShowOnboarding(false);
-    } catch (error) {
-      console.error('Error saving onboarding status:', error);
+    if (userId) {
+      fetchDailyProgress();
+      fetchWeeklyData();
     }
-  };
+  }, [userId, fetchDailyProgress, fetchWeeklyData]);
 
-  const handleSaveGoals = async (goals: UserGoalInput) => {
-    if (!userId) return; // Ensure userId is a string
-    try {
-      await updateUserNutritionGoals(userId, goals);
-      await loadUserGoals(); // Reload goals after saving
-      Alert.alert('Success', 'Your nutrition goals have been updated!');
-      setShowGoalsModal(false);
-    } catch (error) {
-      console.error('Error saving nutrition goals:', error);
-      Alert.alert('Error', 'Failed to save nutrition goals. Please try again.');
-    }
-  };
+  // Refresh data periodically
+  useEffect(() => {
+    if (!userId) return;
 
-  const loadUserGoals = async () => {
-    if (!userId) return; // Ensure userId is a string
-    try {
-      const goals = await fetchUserNutritionGoals(userId);
-      if (goals) {
-        setCurrentGoals(goals);
-      }
-    } catch (error) {
-      console.error('Error loading nutrition goals:', error);
+    const refreshInterval = setInterval(() => {
+      fetchDailyProgress();
+    }, 60000); // Refresh every minute
+
+    return () => clearInterval(refreshInterval);
+  }, [userId, fetchDailyProgress]);
+
+  // Update progress after analysis
+  useEffect(() => {
+    if (result) {
+      fetchDailyProgress();
     }
-  };
+  }, [result, fetchDailyProgress]);
 
   const resetAnalysis = () => {
     setImage(null);
@@ -3048,17 +3016,16 @@ export default function NutritionAnalyzer() {
 
   const debouncedAnalyzeText = useCallback(
     debounce(async (text: string) => {
-      if (!text.trim() || isLoading || typeof userId !== 'string') return;
+      if (!text.trim() || isLoading || !userId) return;
       
       try {
         setIsLoading(true);
         router.push('/(tabs)/nutritionanalyzer');
         const { analysis } = await analyzeNutrition('text', text, userId);
         setResult(analysis);
-        setShowDashboard(true);
       } catch (error) {
-        console.error('Error analyzing text:', error);
-        Alert.alert('Error', 'Failed to analyze text. Please try again.');
+        console.error('Error analyzing nutrition:', error);
+        Alert.alert('Error', 'Failed to analyze nutrition. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -3080,13 +3047,17 @@ export default function NutritionAnalyzer() {
   }, [debouncedAnalyzeText]);
 
   const handleImageAnalysis = async (imageUri: string) => {
-    if (!imageUri || isLoading || typeof userId !== 'string') return;
+    if (!userId) {
+      Alert.alert('Error', 'Please sign in to analyze food.');
+      return;
+    }
 
     try {
       setIsLoading(true);
-      const { analysis } = await analyzeNutrition('image', imageUri, userId);
+      router.push('/(tabs)/nutritionanalyzer');
+      const { analysis, progress } = await analyzeNutrition('image', imageUri, userId);
       setResult(analysis);
-      setShowDashboard(true);
+      setDailyProgress(progress); // Update progress immediately after analysis
     } catch (error) {
       console.error('Error analyzing image:', error);
       Alert.alert('Error', 'Failed to analyze image. Please try again.');
@@ -3143,15 +3114,23 @@ export default function NutritionAnalyzer() {
     }
   };
 
+  const handleSaveGoals = async (goals: UserGoalInput) => {
+    if (!userId) return;
+    
+    try {
+      await updateUserNutritionGoals(userId, goals);
+      await fetchDailyProgress(); // Fetch updated progress and goals
+      Alert.alert('Success', 'Your nutrition goals have been updated!');
+      setShowGoalsModal(false);
+    } catch (error) {
+      console.error('Error saving nutrition goals:', error);
+      Alert.alert('Error', 'Failed to save nutrition goals. Please try again.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      
-      <NutritionAnalyzerOnboarding
-        visible={showOnboarding}
-        onClose={handleOnboardingClose}
-      />
-
       <LinearGradient
         colors={['#0B1120', '#1A237E']}
         style={[styles.gradient, { paddingTop: insets.top }]}
@@ -3179,7 +3158,6 @@ export default function NutritionAnalyzer() {
             </View>
           </View>
         </View>
-
         <ScrollView 
           style={styles.content}
           contentContainerStyle={styles.scrollContent}
@@ -3188,7 +3166,7 @@ export default function NutritionAnalyzer() {
           {showDashboard ? (
             <NutritionVisualization result={result} dailyProgress={dailyProgress} />
           ) : (
-            <View style={styles.mainContent}>
+            <>
               <View style={styles.inputSection}>
                 <View style={styles.imageInputs}>
                   <TouchableOpacity
@@ -3247,39 +3225,106 @@ export default function NutritionAnalyzer() {
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>
-
-                {image && (
-                  <MotiView
-                    from={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ type: 'timing', duration: 300 }}
-                    style={styles.imagePreview}
-                  >
-                    <Image source={{ uri: image }} style={styles.previewImage} />
-                  </MotiView>
-                )}
-
-                {isLoading && (
-                  <MotiView
-                    from={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ type: 'timing', duration: 300 }}
-                    style={styles.loadingContainer}
-                  >
-                    <ActivityIndicator size="large" color="#4C6EF5" />
-                    <Text style={styles.loadingText}>Analyzing nutrition...</Text>
-                  </MotiView>
-                )}
               </View>
-            </View>
+
+              {image && (
+                <MotiView
+                  from={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: 'timing', duration: 300 }}
+                  style={styles.imagePreview}
+                >
+                  <Image source={{ uri: image }} style={styles.previewImage} />
+                </MotiView>
+              )}
+
+              {isLoading && (
+                <MotiView
+                  from={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: 'timing', duration: 300 }}
+                  style={styles.loadingContainer}
+                >
+                  <ActivityIndicator size="large" color="#4C6EF5" />
+                  <Text style={styles.loadingText}>Analyzing nutrition...</Text>
+                </MotiView>
+              )}
+
+              {result && !showDashboard && (
+                <MotiView
+                  from={{ opacity: 0, translateY: 20 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={{ type: 'timing', duration: 300 }}
+                  style={styles.resultContainer}
+                >
+                  <View style={styles.resultHeader}>
+                    <View style={styles.resultTitleRow}>
+                      <Text style={styles.foodName}>{result.basic_info.food_name}</Text>
+                      <TouchableOpacity
+                        style={styles.closeButton}
+                        onPress={resetAnalysis}
+                      >
+                        <Ionicons name="close-circle" size={24} color="rgba(255, 255, 255, 0.7)" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.mealType}>
+                      <Ionicons name="time" size={16} color="#4C6EF5" /> {result.meal_type}
+                    </Text>
+                    {result.basic_info.portion_size && (
+                      <Text style={styles.portionSize}>
+                        <Ionicons name="restaurant" size={16} color="rgba(255, 255, 255, 0.7)" /> {result.basic_info.portion_size}
+                      </Text>
+                    )}
+                  </View>
+
+                  {result.health_analysis && (
+                    <View style={styles.healthAnalysis}>
+                      <Text style={styles.sectionTitle}>
+                        <Ionicons name={'medical-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#fff" /> Health Analysis
+                      </Text>
+                      {result.health_analysis.benefits.length > 0 && (
+                        <View style={styles.benefitsContainer}>
+                          <Text style={styles.benefitsTitle}>
+                            <Ionicons name="checkmark-circle" size={18} color="#4C6EF5" /> Benefits
+                          </Text>
+                          {result.health_analysis.benefits.map((benefit, index) => (
+                            <Text key={index} style={styles.benefitItem}>• {benefit}</Text>
+                          ))}
+                        </View>
+                      )}
+                      {result.health_analysis.considerations.length > 0 && (
+                        <View style={styles.considerationsContainer}>
+                          <Text style={styles.considerationsTitle}>
+                            <Ionicons name="information-circle" size={18} color="#4C6EF5" /> Considerations
+                          </Text>
+                          {result.health_analysis.considerations.map((consideration, index) => (
+                            <Text key={index} style={styles.considerationItem}>• {consideration}</Text>
+                          ))}
+                        </View>
+                      )}
+                      {result.health_analysis.allergens.length > 0 && (
+                        <View style={styles.allergensContainer}>
+                          <Text style={styles.allergensTitle}>
+                            <Ionicons name="alert-circle" size={18} color="#4C6EF5" /> Allergens
+                          </Text>
+                          {result.health_analysis.allergens.map((allergen, index) => (
+                            <Text key={index} style={styles.allergenItem}>• {allergen}</Text>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </MotiView>
+              )}
+            </>
           )}
         </ScrollView>
       </LinearGradient>
-      <GoalsModalComponent
+      <NutritionGoalsModal
         visible={showGoalsModal}
         onClose={() => setShowGoalsModal(false)}
         onSave={handleSaveGoals}
-        initialGoals={currentGoals || undefined} // Handle null by providing undefined
+        initialGoals={currentGoals || undefined}
       />
     </View>
   );

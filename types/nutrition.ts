@@ -37,12 +37,14 @@ export interface NutritionalContent {
 }
 
 export interface DailyProgress {
+  user_id: string;
   date: string;
   total_calories: number;
   total_protein: number;
   total_carbs: number;
   total_fat: number;
-  meal_entries?: {
+  meals_logged: number;
+  meal_entries: Array<{
     meal_type: string;
     food_name: string;
     calories: number;
@@ -50,7 +52,7 @@ export interface DailyProgress {
     carbs: number;
     fat: number;
     timestamp: string;
-  }[];
+  }>;
 }
 
 export interface NutritionAnalysis {

@@ -489,15 +489,20 @@ async function calculateOptimalReminders(userId: string): Promise<ReminderSettin
 async function getDailyProgress(userId: string): Promise<{ progress: NutritionProgress; goals: { daily_calories: number; daily_protein: number; daily_carbs: number; daily_fat: number } }> {
   try {
     console.log('[Progress] Fetching progress for user:', userId);
-    const today = new Date().toISOString().split('T')[0];
     
-    // Get today's progress from progress_tracking table
+    // Get today's date in the correct format (YYYY-MM-DD)
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
+    // Get today's progress from progress_tracking table with more flexible date matching
     const { data: progressData, error: progressError } = await supabase
       .from('progress_tracking')
       .select('total_calories, total_protein, total_carbs, total_fat, meals_logged, date')
       .eq('user_id', userId)
-      .eq('date', today)
-      .maybeSingle(); // Use maybeSingle instead of single to handle null case without error
+      .gte('date', today + ' 00:00:00')
+      .lte('date', today + ' 23:59:59')
+      .order('date', { ascending: false })
+      .limit(1);
 
     if (progressError) {
       console.error('[Progress] Error fetching progress:', progressError);
@@ -508,12 +513,12 @@ async function getDailyProgress(userId: string): Promise<{ progress: NutritionPr
     const goals = await getDailyGoals(userId);
 
     // If no progress data exists for today, return zeros
-    const progress = progressData ? {
-      calories: progressData.total_calories || 0,
-      protein: progressData.total_protein || 0,
-      carbs: progressData.total_carbs || 0,
-      fat: progressData.total_fat || 0,
-      meals_logged: progressData.meals_logged || 0
+    const progress = progressData && progressData[0] ? {
+      calories: progressData[0].total_calories || 0,
+      protein: progressData[0].total_protein || 0,
+      carbs: progressData[0].total_carbs || 0,
+      fat: progressData[0].total_fat || 0,
+      meals_logged: progressData[0].meals_logged || 0
     } : {
       calories: 0,
       protein: 0,
@@ -522,6 +527,7 @@ async function getDailyProgress(userId: string): Promise<{ progress: NutritionPr
       meals_logged: 0
     };
 
+    console.log('[Progress] Retrieved progress:', progress);
     return { progress, goals };
 
   } catch (error) {

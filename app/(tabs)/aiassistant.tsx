@@ -18,6 +18,7 @@ import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+// import { useServices } from '../../context/ServiceContext';
 
 const { width } = Dimensions.get('window');
 
@@ -45,13 +46,66 @@ interface Message {
   id: string;
 }
 
-const INITIAL_PROMPT = `You are an AI health assistant specializing in nutrition, exercise, and diet planning. 
-Keep your responses concise, clear, and mobile-friendly.
-Focus on providing actionable advice and recommendations.
-Always maintain a professional yet friendly tone.
-If you're unsure about something, acknowledge it and suggest consulting a healthcare professional.`;
+const servicesContext = `
+OmniHealth provides the following AI-powered health services:
+
+
+1. 🍎 Nutrition Analyzer
+   - Real-time food analysis and tracking
+   - Detailed nutritional content analysis
+   - Daily and weekly progress monitoring
+   - Personalized nutrition insights
+   - Multi-channel reporting (SMS, WhatsApp, Email)
+   - Smart goal tracking and adjustments
+   - Location-aware food recommendations
+   - Mobile-friendly food logging
+   - Automated progress reports
+   - Trend analysis and recommendations
+
+2. 📋 Diet Planner
+   - Personalized meal planning
+   - Real-time nutrition tracking
+   - Daily and weekly progress reports
+   - Customized dietary recommendations
+   - Integration with Nutrition Analyzer
+   - Meal modification suggestions
+   - Dietary restriction handling
+   - Cultural food preferences
+   - Recipe recommendations
+   - Shopping list generation
+
+3. 💪 Exercise Coach
+   - Personalized workout planning
+   - Considers age, fitness level, and medical conditions
+   - Equipment-aware exercise recommendations
+   - Progress tracking and adjustments
+   - Video guidance for exercises
+   - AI analysis of workout effectiveness
+   - Adapts plans based on progress
+   - Integration with nutrition tracking
+   - Exercise video recommendations
+   - Real-time performance analysis
+
+
+
+`;
+
+const INITIAL_PROMPT = `You are OmniHealth's friendly and knowledgeable AI healthcare assistant. Your role is to help users discover and understand our health services.
+
+${servicesContext}
+
+IMPORTANT GUIDELINES:
+1. Always reference services using their exact names and emojis
+2. When suggesting a service, explain how its features match the user's needs
+3. Keep responses concise and mobile-friendly
+4. Maintain a supportive and professional tone
+5. End responses with an engaging question
+6. Use the service information provided above to answer accurately
+
+Remember: Your responses should be based on the accurate service information provided above.`;
 
 export default function AIAssistant() {
+  // const { services } = useServices();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -116,8 +170,22 @@ export default function AIAssistant() {
         throw new Error('API key is not configured');
       }
 
-      // Send message using chat session
-      const result = await chatRef.current.sendMessage([{ text: input.trim() }] as Part[]);
+      // Send message with service context
+      const result = await chatRef.current.sendMessage([{
+        text: `${servicesContext}
+
+Previous conversation:
+${messages.slice(-3).map(msg => `${msg.role}: ${msg.content}`).join('\n')}
+
+Current query: ${input.trim()}
+
+Remember to:
+1. Use the service information provided above to answer accurately
+2. Include relevant emojis when mentioning services
+3. Reference specific features from the services
+4. Keep responses concise and mobile-friendly
+5. End with an engaging question`
+      }] as Part[]);
       const response = await result.response;
       const text = response.text();
 
@@ -139,7 +207,7 @@ export default function AIAssistant() {
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading]);
+  }, [input, isLoading, messages]);
 
   return (
     <View style={styles.container}>
