@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { MotiView } from 'moti';
 import { useAuth } from '@clerk/clerk-expo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { analyzeNutrition, getDailyProgress, getDailyGoals, generateNutritionReport, getWeeklyData } from '../../services/nutritionAnalyzer';
 import { registerForPushNotifications, scheduleNutritionReminders } from '../../services/pushNotifications';
 import { PieChart, LineChart } from 'react-native-chart-kit';
@@ -17,6 +18,7 @@ import { BlurView } from 'expo-blur';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import debounce from 'lodash/debounce';
 import { NutritionGoalsModal as GoalsModalComponent } from '../../components/NutritionGoalsModal';
+import { NutritionAnalyzerOnboarding } from '../../components/NutritionAnalyzerOnboarding';
 import { 
   fetchUserNutritionGoals, 
   updateUserNutritionGoals, 
@@ -2466,6 +2468,22 @@ const styles = StyleSheet.create({
     marginTop: 8,
     overflow: 'hidden',
   },
+  nutrientProgressBar: {
+    height: '100%',
+    backgroundColor: '#14B8A6',
+    borderRadius: 2,
+  },
+  nutrientTarget: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+  },
+  legendTextContainer: {
+    flex: 1,
+  },
+  legendSubtext: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+  },
   trendsContainer: {
     flex: 1,
   },
@@ -2956,6 +2974,7 @@ export default function NutritionAnalyzer() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<NutritionResult | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [dailyProgress, setDailyProgress] = useState<NutritionProgress>({
     calories: 0,
     protein: 0,
@@ -2972,22 +2991,27 @@ export default function NutritionAnalyzer() {
   const [showGoalsModal, setShowGoalsModal] = useState(false);
   const [currentGoals, setCurrentGoals] = useState<UserNutritionGoals | null>(null);
 
-  // Fetch user's nutrition goals when component mounts
+  // Check if onboarding should be shown
   useEffect(() => {
-    if (userId) {
-      loadUserGoals();
-    }
-  }, [userId]);
-
-  const loadUserGoals = async () => {
-    if (!userId) return; // Ensure userId is a string
-    try {
-      const goals = await fetchUserNutritionGoals(userId);
-      if (goals) {
-        setCurrentGoals(goals);
+    const checkOnboardingStatus = async () => {
+      try {
+        const hasSeenOnboarding = await AsyncStorage.getItem('nutrition_analyzer_onboarding_seen');
+        if (!hasSeenOnboarding) {
+          setShowOnboarding(true);
+        }
+      } catch (error) {
+        console.error('Error checking onboarding status:', error);
       }
+    };
+    checkOnboardingStatus();
+  }, []);
+
+  const handleOnboardingClose = async () => {
+    try {
+      await AsyncStorage.setItem('nutrition_analyzer_onboarding_seen', 'true');
+      setShowOnboarding(false);
     } catch (error) {
-      console.error('Error loading nutrition goals:', error);
+      console.error('Error saving onboarding status:', error);
     }
   };
 
@@ -3001,6 +3025,18 @@ export default function NutritionAnalyzer() {
     } catch (error) {
       console.error('Error saving nutrition goals:', error);
       Alert.alert('Error', 'Failed to save nutrition goals. Please try again.');
+    }
+  };
+
+  const loadUserGoals = async () => {
+    if (!userId) return; // Ensure userId is a string
+    try {
+      const goals = await fetchUserNutritionGoals(userId);
+      if (goals) {
+        setCurrentGoals(goals);
+      }
+    } catch (error) {
+      console.error('Error loading nutrition goals:', error);
     }
   };
 
@@ -3110,6 +3146,12 @@ export default function NutritionAnalyzer() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
+      
+      <NutritionAnalyzerOnboarding
+        visible={showOnboarding}
+        onClose={handleOnboardingClose}
+      />
+
       <LinearGradient
         colors={['#0B1120', '#1A237E']}
         style={[styles.gradient, { paddingTop: insets.top }]}
@@ -3136,7 +3178,7 @@ export default function NutritionAnalyzer() {
               </TouchableOpacity>
             </View>
           </View>
-        </View> {/* Close the View tag here */}
+        </View>
 
         <ScrollView 
           style={styles.content}
