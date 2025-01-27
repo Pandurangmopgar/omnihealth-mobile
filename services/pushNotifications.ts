@@ -147,7 +147,7 @@ async function getUserTimezone(userId: string): Promise<string> {
   try {
     // Get user's location from Supabase
     const { data: userData, error } = await supabase
-      .from('users')
+      .from('medipredict_users')
       .select('location')
       .eq('id', userId)
       .single();

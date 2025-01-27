@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { MotiView } from 'moti';
 import { useAuth } from '@clerk/clerk-expo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { analyzeNutrition, getDailyProgress, getDailyGoals, generateNutritionReport, getWeeklyData } from '../../services/nutritionAnalyzer';
 import { registerForPushNotifications, scheduleNutritionReminders } from '../../services/pushNotifications';
 import { PieChart, LineChart } from 'react-native-chart-kit';
@@ -17,6 +18,7 @@ import { BlurView } from 'expo-blur';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import debounce from 'lodash/debounce';
 import { NutritionGoalsModal as GoalsModalComponent } from '../../components/NutritionGoalsModal';
+import { NutritionAnalyzerOnboarding } from '../../components/NutritionAnalyzerOnboarding';
 import { 
   fetchUserNutritionGoals, 
   updateUserNutritionGoals, 
@@ -2938,6 +2940,7 @@ export default function NutritionAnalyzer() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<NutritionResult | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [dailyProgress, setDailyProgress] = useState<NutritionProgress>({
     calories: 0,
     protein: 0,
@@ -3124,12 +3127,52 @@ export default function NutritionAnalyzer() {
     }
   };
 
+  // For testing: Always show onboarding for specific user
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      // Always show onboarding for test user
+      if (userId === 'user_2obkiD7OkbfeHRrGibmDapVAkah') {
+        setShowOnboarding(true);
+        return;
+      }
+
+      try {
+        const hasSeenOnboarding = await AsyncStorage.getItem('nutrition_analyzer_onboarding_seen');
+        if (!hasSeenOnboarding) {
+          setShowOnboarding(true);
+        }
+      } catch (error) {
+        console.error('Error checking onboarding status:', error);
+      }
+    };
+
+    checkOnboardingStatus();
+  }, [userId]);
+
+  const handleOnboardingClose = async () => {
+    setShowOnboarding(false);
+    // Only save the onboarding status for non-test users
+    if (userId !== 'user_2obkiD7OkbfeHRrGibmDapVAkah') {
+      try {
+        await AsyncStorage.setItem('nutrition_analyzer_onboarding_seen', 'true');
+      } catch (error) {
+        console.error('Error saving onboarding status:', error);
+      }
+    }
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar style="light" />
+      
+      <NutritionAnalyzerOnboarding
+        visible={showOnboarding}
+        onClose={handleOnboardingClose}
+      />
+      
       <LinearGradient
         colors={['#0B1120', '#1A237E']}
-        style={[styles.gradient, { paddingTop: insets.top }]}
+        style={styles.gradient}
       >
         <View style={styles.header}>
           <View style={styles.headerContent}>
