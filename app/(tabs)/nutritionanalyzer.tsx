@@ -715,64 +715,75 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
               />
             )}
 
-                  {/* Macronutrients Section */}
-            <View style={styles.macronutrientsSection}>
-              <Text style={styles.sectionTitle}>
-                <Ionicons name={'cellular-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#4C6EF5" /> Macronutrients
-              </Text>
-                      {Object.entries({
-                protein: { color: COLORS.protein[0], icon: 'fitness-outline' },
-                carbs: { color: COLORS.carbs[0], icon: 'leaf-outline' },
-                fat: { color: COLORS.fat[0], icon: 'water-outline' }
-                      }).map(([nutrient, { color, icon }]) => (
-                <View key={nutrient} style={styles.macronutrientItem}>
-                  <View style={styles.macronutrientHeader}>
-                    <View style={styles.macronutrientIcon}>
-                      <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={color} />
-                            </View>
-                    <Text style={styles.macronutrientName}>
-                              {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
-                            </Text>
-                    <Text style={[styles.macronutrientPercentage, { color }]}>
-                      {goals ? Math.round((nutritionData[nutrient as keyof NutritionData] / 
-                        goals[`daily_${nutrient}` as keyof NutritionGoals]) * 100) : 0}%
-                            </Text>
-                          </View>
-                  <View style={styles.macronutrientProgressBar}>
-                            <LinearGradient
-                              colors={COLORS[nutrient as keyof typeof COLORS]}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 0 }}
-                              style={[
-                                styles.progressBar,
-                                {
-                          width: goals ? 
-                            `${Math.min((nutritionData[nutrient as keyof NutritionData] / 
-                            goals[`daily_${nutrient}` as keyof NutritionGoals]) * 100, 100)}%` : '0%'
-                                }
-                              ]}
-                            />
-                          </View>
-                  <View style={styles.macronutrientDetails}>
-                    <Text style={styles.macronutrientAmount}>
-                      {Math.round(nutritionData[nutrient as keyof NutritionData])}g
-                            </Text>
-                    <Text style={styles.macronutrientGoal}>
-                              of {goals?.[`daily_${nutrient}` as keyof NutritionGoals]}g goal
-                            </Text>
-                          </View>
-                        </View>
-                      ))}
+            {/* Macronutrients Section */}
+            {result?.nutritional_content?.macronutrients && (
+              <View style={styles.macronutrientsSection}>
+                <Text style={styles.sectionTitle}>
+                  <Ionicons name={'cellular-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#4C6EF5" /> Macronutrients
+                </Text>
+                {Object.entries({
+                  protein: { 
+                    data: result.nutritional_content.macronutrients.protein,
+                    color: COLORS.protein[0], 
+                    icon: 'fitness-outline' 
+                  },
+                  carbs: { 
+                    data: result.nutritional_content.macronutrients.carbs,
+                    color: COLORS.carbs[0], 
+                    icon: 'leaf-outline' 
+                  },
+                  fat: { 
+                    data: result.nutritional_content.macronutrients.fats,
+                    color: COLORS.fat[0], 
+                    icon: 'water-outline' 
+                  }
+                }).map(([nutrient, { data, color, icon }]) => (
+                  <View key={nutrient} style={styles.macronutrientItem}>
+                    <View style={styles.macronutrientHeader}>
+                      <View style={styles.macronutrientIcon}>
+                        <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={color} />
+                      </View>
+                      <Text style={styles.macronutrientName}>
+                        {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
+                      </Text>
+                      <Text style={[styles.macronutrientPercentage, { color }]}>
+                        {data.daily_value_percentage}%
+                      </Text>
+                    </View>
+                    <View style={styles.macronutrientProgressBar}>
+                      <LinearGradient
+                        colors={COLORS[nutrient === 'fats' ? 'fat' : nutrient as keyof typeof COLORS]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={[
+                          styles.progressBar,
+                          {
+                            width: `${Math.min(data.daily_value_percentage, 100)}%`
+                          }
+                        ]}
+                      />
+                    </View>
+                    <View style={styles.macronutrientDetails}>
+                      <Text style={styles.macronutrientAmount}>
+                        {Math.round(data.amount)}g
+                      </Text>
+                      <Text style={styles.macronutrientGoal}>
+                        of daily recommended value
+                      </Text>
+                    </View>
                   </View>
-
+                ))}
+              </View>
+            )}
+            
             {/* Vitamins Section */}
             {result?.nutritional_content?.micronutrients?.vitamins && 
-             result?.nutritional_content.micronutrients.vitamins.length > 0 && (
+             result.nutritional_content.micronutrients.vitamins.length > 0 && (
               <View style={styles.micronutrientsSection}>
                 <Text style={styles.sectionTitle}>
                   <Ionicons name={'flash-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#4C6EF5" /> Vitamins
                 </Text>
-                {result?.nutritional_content.micronutrients.vitamins.map((vitamin, index) => (
+                {result.nutritional_content.micronutrients.vitamins.map((vitamin, index) => (
                   <MicronutrientCard
                     key={index}
                     name={vitamin.name}
@@ -782,17 +793,17 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                     type="vitamin"
                   />
                 ))}
-                      </View>
+              </View>
             )}
             
             {/* Minerals Section */}
             {result?.nutritional_content?.micronutrients?.minerals && 
-             result?.nutritional_content.micronutrients.minerals.length > 0 && (
+             result.nutritional_content.micronutrients.minerals.length > 0 && (
               <View style={styles.micronutrientsSection}>
                 <Text style={styles.sectionTitle}>
                   <Ionicons name={'fitness-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#14B8A6" /> Minerals
-                        </Text>
-                {result?.nutritional_content.micronutrients.minerals.map((mineral, index) => (
+                </Text>
+                {result.nutritional_content.micronutrients.minerals.map((mineral, index) => (
                   <MicronutrientCard
                     key={index}
                     name={mineral.name}
@@ -802,7 +813,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                     type="mineral"
                   />
                 ))}
-                      </View>
+              </View>
             )}
 
             {/* Meal Timing Section */}
@@ -820,9 +831,9 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                     <Text style={styles.mealTimingReason}>
                       {result.recommendations.meal_timing.reason}
                     </Text>
-                        </View>
-                    </View>
                   </View>
+                </View>
+              </View>
             )}
           </ScrollView>
         );
@@ -1231,10 +1242,22 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
               <Ionicons name={'cellular-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#4C6EF5" /> Macronutrients
             </Text>
                     {Object.entries({
-              protein: { color: COLORS.protein[0], icon: 'fitness-outline' },
-              carbs: { color: COLORS.carbs[0], icon: 'leaf-outline' },
-              fat: { color: COLORS.fat[0], icon: 'water-outline' }
-                    }).map(([nutrient, { color, icon }]) => (
+              protein: { 
+                data: result?.nutritional_content?.macronutrients?.protein,
+                color: COLORS.protein[0], 
+                icon: 'fitness-outline' 
+              },
+              carbs: { 
+                data: result?.nutritional_content?.macronutrients?.carbs,
+                color: COLORS.carbs[0], 
+                icon: 'leaf-outline' 
+              },
+              fat: { 
+                data: result?.nutritional_content?.macronutrients?.fats,
+                color: COLORS.fat[0], 
+                icon: 'water-outline' 
+              }
+                    }).map(([nutrient, { data, color, icon }]) => (
               <View key={nutrient} style={styles.macronutrientItem}>
                 <View style={styles.macronutrientHeader}>
                   <View style={styles.macronutrientIcon}>
@@ -1244,31 +1267,28 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                             {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
                           </Text>
                   <Text style={[styles.macronutrientPercentage, { color }]}>
-                    {goals ? Math.round((nutritionData[nutrient as keyof NutritionData] / 
-                      goals[`daily_${nutrient}` as keyof NutritionGoals]) * 100) : 0}%
+                    {data?.daily_value_percentage}%
                           </Text>
                         </View>
                 <View style={styles.macronutrientProgressBar}>
                           <LinearGradient
-                            colors={COLORS[nutrient as keyof typeof COLORS]}
+                            colors={COLORS[nutrient === 'fats' ? 'fat' : nutrient as keyof typeof COLORS]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={[
                               styles.progressBar,
                               {
-                        width: goals ? 
-                          `${Math.min((nutritionData[nutrient as keyof NutritionData] / 
-                          goals[`daily_${nutrient}` as keyof NutritionGoals]) * 100, 100)}%` : '0%'
+                        width: `${Math.min(data.daily_value_percentage, 100)}%`
                               }
                             ]}
                           />
                         </View>
                 <View style={styles.macronutrientDetails}>
                   <Text style={styles.macronutrientAmount}>
-                    {Math.round(nutritionData[nutrient as keyof NutritionData])}g
+                    {Math.round(data.amount)}g
                           </Text>
                   <Text style={styles.macronutrientGoal}>
-                            of {goals?.[`daily_${nutrient}` as keyof NutritionGoals]}g goal
+                            of daily recommended value
                           </Text>
                         </View>
                       </View>
@@ -2001,21 +2021,25 @@ const styles = StyleSheet.create({
   },
   statsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 16,
+    justifyContent: 'space-between',
   },
   statItem: {
+    flex: 1,
     alignItems: 'center',
-    gap: 8,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 8,
   },
   statValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '700',
+    marginVertical: 8,
+  },
+  statLabel: {
+    color: '#9CA3AF',
+    fontSize: 14,
   },
   caloriesCard: {
     height: 150,
@@ -2180,7 +2204,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   nutrientTarget: {
-    color: 'rgba(255,255,255,0.6)',
+    color: '#9CA3AF',
     fontSize: 12,
   },
   legendTextContainer: {
@@ -2383,6 +2407,15 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     marginTop: 8,
     overflow: 'hidden',
+  },
+  nutrientProgressBar: {
+    height: '100%',
+    backgroundColor: '#14B8A6',
+    borderRadius: 2,
+  },
+  nutrientTarget: {
+    color: '#9CA3AF',
+    fontSize: 12,
   },
   trendsContainer: {
     flex: 1,
@@ -3354,7 +3387,7 @@ export default function NutritionAnalyzer() {
                     transition={{ type: 'timing', duration: 300 }}
                     style={styles.loadingContainer}
                   >
-                    <ActivityIndicator size="large" color="#4C6EF5" />
+                    <ActivityIndicator size="large" color="#4F46E5" />
                     <Text style={styles.loadingText}>Analyzing nutrition...</Text>
                   </MotiView>
                 )}
