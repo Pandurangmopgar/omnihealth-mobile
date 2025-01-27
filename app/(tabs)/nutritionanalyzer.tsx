@@ -707,134 +707,192 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
       case 'details':
         return (
           <ScrollView style={styles.detailsContainer}>
-            {/* Health Score Section */}
-            {result?.health_analysis?.health_score && (
-              <HealthScoreCard 
-                score={result.health_analysis.health_score.score}
-                factors={result.health_analysis.health_score.factors}
-              />
-            )}
-
-            {/* Macronutrients Section */}
-            {result?.nutritional_content?.macronutrients && (
-              <View style={styles.macronutrientsSection}>
-                <Text style={styles.sectionTitle}>
-                  <Ionicons name={'cellular-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#4C6EF5" /> Macronutrients
-                </Text>
-                {Object.entries({
-                  protein: { 
-                    data: result.nutritional_content.macronutrients.protein,
-                    color: COLORS.protein[0], 
-                    icon: 'fitness-outline' 
-                  },
-                  carbs: { 
-                    data: result.nutritional_content.macronutrients.carbs,
-                    color: COLORS.carbs[0], 
-                    icon: 'leaf-outline' 
-                  },
-                  fat: { 
-                    data: result.nutritional_content.macronutrients.fats,
-                    color: COLORS.fat[0], 
-                    icon: 'water-outline' 
-                  }
-                }).map(([nutrient, { data, color, icon }]) => (
-                  <View key={nutrient} style={styles.macronutrientItem}>
-                    <View style={styles.macronutrientHeader}>
-                      <View style={styles.macronutrientIcon}>
-                        <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={color} />
+            {/* Detailed Nutrient Analysis */}
+            <Animated.View entering={FadeInDown.delay(100)} style={styles.analysisCard}>
+              <BlurView intensity={20} style={styles.cardBlur}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+                  style={styles.cardGradient}
+                >
+                  <Text style={styles.sectionTitle}>Comprehensive Analysis</Text>
+                  
+                  {/* Enhanced Health Score Section */}
+                  <View style={styles.healthInsightsSection}>
+                    <Text style={styles.sectionSubtitle}>Health Score</Text>
+                    <View style={styles.healthScore}>
+                      <Text style={styles.healthScoreTitle}>Nutrition Score</Text>
+                      <View style={[styles.healthScoreCircle, { backgroundColor: '#14B8A6' }]}>
+                        <Text style={styles.healthScoreValue}>
+                          {result?.health_analysis.health_score.score}
+                        </Text>
                       </View>
-                      <Text style={styles.macronutrientName}>
-                        {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
-                      </Text>
-                      <Text style={[styles.macronutrientPercentage, { color }]}>
-                        {data.daily_value_percentage}%
-                      </Text>
-                    </View>
-                    <View style={styles.macronutrientProgressBar}>
-                      <LinearGradient
-                        colors={COLORS[nutrient === 'fats' ? 'fat' : nutrient as keyof typeof COLORS]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={[
-                          styles.progressBar,
-                          {
-                            width: `${Math.min(data.daily_value_percentage, 100)}%`
-                          }
-                        ]}
-                      />
-                    </View>
-                    <View style={styles.macronutrientDetails}>
-                      <Text style={styles.macronutrientAmount}>
-                        {Math.round(data.amount)}g
-                      </Text>
-                      <Text style={styles.macronutrientGoal}>
-                        of daily recommended value
-                      </Text>
+                      <ScrollView style={styles.healthFactors}>
+                        {result?.health_analysis.health_score.factors.map((factor: string, index: number) => (
+                          <View key={index} style={styles.healthFactorRow}>
+                            <Ionicons name="checkmark-circle" size={16} color="#14B8A6" />
+                            <Text style={styles.healthFactor}>{factor}</Text>
+                          </View>
+                        ))}
+                      </ScrollView>
                     </View>
                   </View>
-                ))}
-              </View>
-            )}
-            
-            {/* Vitamins Section */}
-            {result?.nutritional_content?.micronutrients?.vitamins && 
-             result.nutritional_content.micronutrients.vitamins.length > 0 && (
-              <View style={styles.micronutrientsSection}>
-                <Text style={styles.sectionTitle}>
-                  <Ionicons name={'flash-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#4C6EF5" /> Vitamins
-                </Text>
-                {result.nutritional_content.micronutrients.vitamins.map((vitamin, index) => (
-                  <MicronutrientCard
-                    key={index}
-                    name={vitamin.name}
-                    amount={vitamin.amount}
-                    unit={vitamin.unit}
-                    percentage={vitamin.daily_value_percentage}
-                    type="vitamin"
-                  />
-                ))}
-              </View>
-            )}
-            
-            {/* Minerals Section */}
-            {result?.nutritional_content?.micronutrients?.minerals && 
-             result.nutritional_content.micronutrients.minerals.length > 0 && (
-              <View style={styles.micronutrientsSection}>
-                <Text style={styles.sectionTitle}>
-                  <Ionicons name={'fitness-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#14B8A6" /> Minerals
-                </Text>
-                {result.nutritional_content.micronutrients.minerals.map((mineral, index) => (
-                  <MicronutrientCard
-                    key={index}
-                    name={mineral.name}
-                    amount={mineral.amount}
-                    unit={mineral.unit}
-                    percentage={mineral.daily_value_percentage}
-                    type="mineral"
-                  />
-                ))}
-              </View>
-            )}
 
-            {/* Meal Timing Section */}
-            {result && result.recommendations?.meal_timing && (
-              <View style={styles.mealTimingSection}>
-                <Text style={styles.sectionTitle}>
-                  <Ionicons name={'time-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#4C6EF5" /> Meal Timing
-                </Text>
-                <View style={styles.mealTimingCard}>
-                  <Ionicons name={'time-outline' as keyof typeof Ionicons.glyphMap} size={24} color="#4C6EF5" />
-                  <View style={styles.mealTimingContent}>
-                    <Text style={styles.mealTimingTime}>
-                      {result.recommendations.meal_timing.best_time}
-                    </Text>
-                    <Text style={styles.mealTimingReason}>
-                      {result.recommendations.meal_timing.reason}
-                    </Text>
+                  {/* Enhanced Micronutrients Section */}
+                  <View style={styles.micronutrientSection}>
+                    <Text style={styles.sectionSubtitle}>Vitamins & Minerals</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.micronutrientScroll}>
+                      {result?.nutritional_content.micronutrients.vitamins.map((vitamin: { 
+                        name: string;
+                        amount: number;
+                        unit: string;
+                        daily_value_percentage: number;
+                      }, index: number) => (
+                        <View key={`vitamin-${index}`} style={styles.micronutrientCard}>
+                          <View style={styles.micronutrientHeader}>
+                            <Ionicons name="flash-outline" size={20} color="#14B8A6" />
+                            <Text style={styles.micronutrientName}>{vitamin.name}</Text>
+                          </View>
+                          <Text style={styles.micronutrientValue}>
+                            {vitamin.amount}{vitamin.unit}
+                          </Text>
+                          <View style={styles.micronutrientProgress}>
+                            <LinearGradient
+                              colors={['#14B8A6', '#0D9488']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 0 }}
+                              style={[
+                                styles.micronutrientProgressBar,
+                                { width: `${Math.min(vitamin.daily_value_percentage, 100)}%` }
+                              ]} 
+                            />
+                          </View>
+                          <Text style={styles.micronutrientPercentage}>
+                            {Math.round(vitamin.daily_value_percentage)}% DV
+                          </Text>
+                        </View>
+                      ))}
+                    </ScrollView>
+
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.micronutrientScroll}>
+                      {result?.nutritional_content.micronutrients.minerals.map((mineral: {
+                        name: string;
+                        amount: number;
+                        unit: string;
+                        daily_value_percentage: number;
+                      }, index: number) => (
+                        <View key={`mineral-${index}`} style={styles.micronutrientCard}>
+                          <View style={styles.micronutrientHeader}>
+                            <Ionicons name="diamond-outline" size={20} color="#6366F1" />
+                            <Text style={styles.micronutrientName}>{mineral.name}</Text>
+                          </View>
+                          <Text style={styles.micronutrientValue}>
+                            {mineral.amount}{mineral.unit}
+                          </Text>
+                          <View style={styles.micronutrientProgress}>
+                            <LinearGradient
+                              colors={['#6366F1', '#4F46E5']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 0 }}
+                              style={[
+                                styles.micronutrientProgressBar,
+                                { width: `${Math.min(mineral.daily_value_percentage, 100)}%` }
+                              ]} 
+                            />
+                          </View>
+                          <Text style={styles.micronutrientPercentage}>
+                            {Math.round(mineral.daily_value_percentage)}% DV
+                          </Text>
+                        </View>
+                      ))}
+                    </ScrollView>
                   </View>
-                </View>
-              </View>
-            )}
+
+                  {/* Enhanced Macronutrients Section */}
+                  <View style={styles.nutrientSection}>
+                    <Text style={styles.nutrientSectionTitle}>Macronutrients</Text>
+                    <View style={styles.nutrientList}>
+                      {Object.entries({
+                        protein: { color: COLORS.protein[0], icon: 'fitness' },
+                        carbs: { color: COLORS.carbs[0], icon: 'leaf' },
+                        fat: { color: COLORS.fat[0], icon: 'water' }
+                      }).map(([nutrient, { color, icon }]) => (
+                        <View key={nutrient} style={styles.nutrientDetailItem}>
+                          <View style={styles.nutrientHeader}>
+                            <View style={styles.nutrientIconContainer}>
+                              <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={color} />
+                            </View>
+                            <Text style={styles.nutrientName}>
+                              {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
+                            </Text>
+                            <Text style={[styles.nutrientPercentage, { color }]}>
+                              {Math.round((nutritionData[nutrient as keyof NutritionData] / 
+                                (goals?.[`daily_${nutrient}` as keyof NutritionGoals] || 1)) * 100)}%
+                            </Text>
+                          </View>
+                          <View style={styles.nutrientProgress}>
+                            <LinearGradient
+                              colors={COLORS[nutrient as keyof typeof COLORS]}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 0 }}
+                              style={[
+                                styles.progressBar,
+                                {
+                                  width: `${(nutritionData[nutrient as keyof NutritionData] / 
+                                    (goals?.[`daily_${nutrient}` as keyof NutritionGoals] || 1)) * 100}%`
+                                }
+                              ]}
+                            />
+                          </View>
+                          <View style={styles.nutrientDetailsCard}>
+                            <Text style={styles.nutrientAmount}>
+                              {Math.round(nutritionData[nutrient as keyof NutritionData])}g
+                            </Text>
+                            <Text style={styles.nutrientGoal}>
+                              of {goals?.[`daily_${nutrient}` as keyof NutritionGoals]}g goal
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+
+                  {/* Meal Timing Analysis */}
+                  <View style={styles.mealTimingSection}>
+                    <Text style={styles.sectionSubtitle}>Optimal Meal Timing</Text>
+                    <View style={styles.mealTimingCard}>
+                      <Ionicons name="time-outline" size={24} color="#14B8A6" />
+                      <View style={styles.mealTimingContent}>
+                        <Text style={styles.mealTimingTime}>
+                          {result?.recommendations.meal_timing.best_time}
+                        </Text>
+                        <Text style={styles.mealTimingReason}>
+                          {result?.recommendations.meal_timing.reason}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Daily Summary */}
+                  <View style={styles.summarySection}>
+                    <Text style={styles.nutrientSectionTitle}>Daily Summary</Text>
+                    <View style={styles.summaryGrid}>
+                      <View style={styles.summaryItem}>
+                        <Ionicons name="restaurant" size={24} color="#14B8A6" />
+                        <Text style={styles.summaryValue}>{dailyProgress.meals_logged}</Text>
+                        <Text style={styles.summaryLabel}>Meals Logged</Text>
+                      </View>
+                      <View style={styles.summaryItem}>
+                        <Ionicons name="flame" size={24} color={COLORS.calories[0]} />
+                        <Text style={styles.summaryValue}>
+                          {Math.round((nutritionData.calories / (goals?.daily_calories || 2000)) * 100)}%
+                        </Text>
+                        <Text style={styles.summaryLabel}>Calorie Goal</Text>
+                      </View>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </BlurView>
+            </Animated.View>
           </ScrollView>
         );
 
@@ -1228,132 +1286,196 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
 
       {activeTab === 'details' && (
         <ScrollView style={styles.detailsContainer}>
-          {/* Health Score Section */}
-          {result?.health_analysis?.health_score && (
-            <HealthScoreCard 
-              score={result.health_analysis.health_score.score}
-              factors={result.health_analysis.health_score.factors}
-            />
-          )}
+          {/* Detailed Nutrient Analysis */}
+          <Animated.View entering={FadeInDown.delay(100)} style={styles.analysisCard}>
+            <BlurView intensity={20} style={styles.cardBlur}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+                style={styles.cardGradient}
+              >
+                <Text style={styles.sectionTitle}>Comprehensive Analysis</Text>
+                
+                {/* Micronutrients Section */}
+                <View style={styles.micronutrientSection}>
+                  <Text style={styles.sectionSubtitle}>Vitamins & Minerals</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.micronutrientScroll}>
+                    {result?.nutritional_content.micronutrients.vitamins.map((vitamin: { 
+                      name: string;
+                      amount: number;
+                      unit: string;
+                      daily_value_percentage: number;
+                    }, index: number) => (
+                      <View key={`vitamin-${index}`} style={styles.micronutrientCard}>
+                        <View style={styles.micronutrientHeader}>
+                          <Ionicons name="flash-outline" size={20} color="#14B8A6" />
+                          <Text style={styles.micronutrientName}>{vitamin.name}</Text>
+                        </View>
+                        <Text style={styles.micronutrientValue}>
+                          {vitamin.amount}{vitamin.unit}
+                        </Text>
+                        <View style={styles.micronutrientProgress}>
+                          <View 
+                            style={[
+                              styles.micronutrientProgressBar,
+                              { width: `${Math.min(vitamin.daily_value_percentage, 100)}%` }
+                            ]} 
+                          />
+                        </View>
+                        <Text style={styles.micronutrientPercentage}>
+                          {Math.round(vitamin.daily_value_percentage)}% DV
+                        </Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.micronutrientScroll}>
+                    {result?.nutritional_content.micronutrients.minerals.map((mineral: {
+                      name: string;
+                      amount: number;
+                      unit: string;
+                      daily_value_percentage: number;
+                    }, index: number) => (
+                      <View key={`mineral-${index}`} style={styles.micronutrientCard}>
+                        <View style={styles.micronutrientHeader}>
+                          <Ionicons name="diamond-outline" size={20} color="#6366F1" />
+                          <Text style={styles.micronutrientName}>{mineral.name}</Text>
+                        </View>
+                        <Text style={styles.micronutrientValue}>
+                          {mineral.amount}{mineral.unit}
+                        </Text>
+                        <View style={styles.micronutrientProgress}>
+                          <View 
+                            style={[
+                              styles.micronutrientProgressBar,
+                              { width: `${Math.min(mineral.daily_value_percentage, 100)}%` }
+                            ]} 
+                          />
+                        </View>
+                        <Text style={styles.micronutrientPercentage}>
+                          {Math.round(mineral.daily_value_percentage)}% DV
+                        </Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                {/* Health Insights */}
+                <View style={styles.healthInsightsSection}>
+                  <Text style={styles.sectionSubtitle}>Health Insights</Text>
+                  <View style={styles.healthScore}>
+                    <Text style={styles.healthScoreTitle}>Nutrition Score</Text>
+                    <View style={styles.healthScoreCircle}>
+                      <Text style={styles.healthScoreValue}>
+                        {result?.health_analysis.health_score.score}
+                      </Text>
+                    </View>
+                    <ScrollView style={styles.healthFactors}>
+                      {result?.health_analysis.health_score.factors.map((factor: string, index: number) => (
+                        <Text key={index} style={styles.healthFactor}>• {factor}</Text>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+
+                {/* Meal Timing Analysis */}
+                <View style={styles.mealTimingSection}>
+                  <Text style={styles.sectionSubtitle}>Optimal Meal Timing</Text>
+                  <View style={styles.mealTimingCard}>
+                    <Ionicons name="time-outline" size={24} color="#14B8A6" />
+                    <View style={styles.mealTimingContent}>
+                      <Text style={styles.mealTimingTime}>
+                        {result?.recommendations.meal_timing.best_time}
+                      </Text>
+                      <Text style={styles.mealTimingReason}>
+                        {result?.recommendations.meal_timing.reason}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
 
                 {/* Macronutrients Section */}
-          <View style={styles.macronutrientsSection}>
-            <Text style={styles.sectionTitle}>
-              <Ionicons name={'cellular-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#4C6EF5" /> Macronutrients
-            </Text>
+                <View style={styles.nutrientSection}>
+                  <Text style={styles.nutrientSectionTitle}>Macronutrients</Text>
+                  <View style={styles.nutrientList}>
                     {Object.entries({
-              protein: { 
-                data: result?.nutritional_content?.macronutrients?.protein,
-                color: COLORS.protein[0], 
-                icon: 'fitness-outline' 
-              },
-              carbs: { 
-                data: result?.nutritional_content?.macronutrients?.carbs,
-                color: COLORS.carbs[0], 
-                icon: 'leaf-outline' 
-              },
-              fat: { 
-                data: result?.nutritional_content?.macronutrients?.fats,
-                color: COLORS.fat[0], 
-                icon: 'water-outline' 
-              }
-                    }).map(([nutrient, { data, color, icon }]) => (
-              <View key={nutrient} style={styles.macronutrientItem}>
-                <View style={styles.macronutrientHeader}>
-                  <View style={styles.macronutrientIcon}>
-                    <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={color} />
+                      protein: { color: COLORS.protein[0], icon: 'fitness' },
+                      carbs: { color: COLORS.carbs[0], icon: 'leaf' },
+                      fat: { color: COLORS.fat[0], icon: 'water' }
+                    }).map(([nutrient, { color, icon }]) => (
+                      <View key={nutrient} style={styles.nutrientDetailItem}>
+                        <View style={styles.nutrientHeader}>
+                          <View style={styles.nutrientIconContainer}>
+                            <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={color} />
                           </View>
-                  <Text style={styles.macronutrientName}>
+                          <Text style={styles.nutrientName}>
                             {nutrient.charAt(0).toUpperCase() + nutrient.slice(1)}
                           </Text>
-                  <Text style={[styles.macronutrientPercentage, { color }]}>
-                    {data?.daily_value_percentage}%
+                          <Text style={[styles.nutrientPercentage, { color }]}>
+                            {Math.round((nutritionData[nutrient as keyof NutritionData] / 
+                              (goals?.[`daily_${nutrient}` as keyof NutritionGoals] || 1)) * 100)}%
                           </Text>
                         </View>
-                <View style={styles.macronutrientProgressBar}>
+                        <View style={styles.nutrientProgress}>
                           <LinearGradient
-                            colors={COLORS[nutrient === 'fats' ? 'fat' : nutrient as keyof typeof COLORS]}
+                            colors={COLORS[nutrient as keyof typeof COLORS]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={[
                               styles.progressBar,
                               {
-                        width: `${Math.min(data.daily_value_percentage, 100)}%`
+                                width: `${(nutritionData[nutrient as keyof NutritionData] / 
+                                  (goals?.[`daily_${nutrient}` as keyof NutritionGoals] || 1)) * 100}%`
                               }
                             ]}
                           />
                         </View>
-                <View style={styles.macronutrientDetails}>
-                  <Text style={styles.macronutrientAmount}>
-                    {Math.round(data.amount)}g
+                        <View style={styles.nutrientDetailsCard}>
+                          <Text style={styles.nutrientAmount}>
+                            {Math.round(nutritionData[nutrient as keyof NutritionData])}g
                           </Text>
-                  <Text style={styles.macronutrientGoal}>
-                            of daily recommended value
+                          <Text style={styles.nutrientGoal}>
+                            of {goals?.[`daily_${nutrient}` as keyof NutritionGoals]}g goal
                           </Text>
                         </View>
                       </View>
                     ))}
-                </View>
-
-          {/* Vitamins Section */}
-          {result?.nutritional_content?.micronutrients?.vitamins && 
-           result?.nutritional_content.micronutrients.vitamins.length > 0 && (
-            <View style={styles.micronutrientsSection}>
-              <Text style={styles.sectionTitle}>
-                <Ionicons name={'flash-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#4C6EF5" /> Vitamins
-              </Text>
-              {result?.nutritional_content.micronutrients.vitamins.map((vitamin, index) => (
-                <MicronutrientCard
-                  key={index}
-                  name={vitamin.name}
-                  amount={vitamin.amount}
-                  unit={vitamin.unit}
-                  percentage={vitamin.daily_value_percentage}
-                  type="vitamin"
-                />
-              ))}
-                    </View>
-          )}
-          
-          {/* Minerals Section */}
-          {result?.nutritional_content?.micronutrients?.minerals && 
-           result?.nutritional_content.micronutrients.minerals.length > 0 && (
-            <View style={styles.micronutrientsSection}>
-              <Text style={styles.sectionTitle}>
-                <Ionicons name={'fitness-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#14B8A6" /> Minerals
-                      </Text>
-              {result?.nutritional_content.micronutrients.minerals.map((mineral, index) => (
-                <MicronutrientCard
-                  key={index}
-                  name={mineral.name}
-                  amount={mineral.amount}
-                  unit={mineral.unit}
-                  percentage={mineral.daily_value_percentage}
-                  type="mineral"
-                />
-              ))}
-                    </View>
-          )}
-          
-          {/* Meal Timing Section */}
-          {result && result.recommendations?.meal_timing && (
-            <View style={styles.mealTimingSection}>
-              <Text style={styles.sectionTitle}>
-                <Ionicons name={'time-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#4C6EF5" /> Meal Timing
-              </Text>
-              <View style={styles.mealTimingCard}>
-                <Ionicons name={'time-outline' as keyof typeof Ionicons.glyphMap} size={24} color="#4C6EF5" />
-                <View style={styles.mealTimingContent}>
-                  <Text style={styles.mealTimingTime}>
-                    {result.recommendations.meal_timing.best_time}
-                  </Text>
-                  <Text style={styles.mealTimingReason}>
-                    {result.recommendations.meal_timing.reason}
-                  </Text>
-                      </View>
                   </View>
                 </View>
-          )}
+
+                {/* Daily Summary */}
+                <View style={styles.summarySection}>
+                  <Text style={styles.nutrientSectionTitle}>Daily Summary</Text>
+                  <View style={styles.summaryGrid}>
+                    <View style={styles.summaryItem}>
+                      <Ionicons name="restaurant" size={24} color="#14B8A6" />
+                      <Text style={styles.summaryValue}>{dailyProgress.meals_logged}</Text>
+                      <Text style={styles.summaryLabel}>Meals Logged</Text>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <Ionicons name="flame" size={24} color={COLORS.calories[0]} />
+                      <Text style={styles.summaryValue}>
+                        {Math.round((nutritionData.calories / (goals?.daily_calories || 2000)) * 100)}%
+                      </Text>
+                      <Text style={styles.summaryLabel}>Calorie Goal</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Nutrition Tips */}
+                <View style={styles.tipsSection}>
+                  <Text style={styles.nutrientSectionTitle}>Nutrition Tips</Text>
+                  <View style={styles.tipsList}>
+                    {generateNutritionTips(nutritionData, goals, dailyProgress).map((tip, index) => (
+                      <View key={index} style={styles.tipItem}>
+                        <Ionicons name={tip.icon as keyof typeof Ionicons.glyphMap} size={20} color={tip.color} />
+                        <Text style={styles.tipText}>{tip.text}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </LinearGradient>
+            </BlurView>
+          </Animated.View>
         </ScrollView>
       )}
 
@@ -1463,85 +1585,6 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
 
       {activeTab === 'report' && renderReportTab()}
     </ScrollView>
-  );
-};
-
-const MicronutrientCard = ({ name, amount, unit, percentage, type }: {
-  name: string;
-  amount: number;
-  unit: string;
-  percentage: number;
-  type: 'vitamin' | 'mineral';
-}) => {
-  const color = type === 'vitamin' ? '#4C6EF5' : '#14B8A6';
-  
-  return (
-    <Animated.View entering={FadeInUp.delay(200)} style={styles.micronutrientCard}>
-      <BlurView intensity={20} style={styles.cardBlur}>
-        <LinearGradient
-          colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
-          style={styles.micronutrientGradient}
-        >
-          <View style={styles.micronutrientHeader}>
-            <Ionicons 
-              name={type === 'vitamin' ? 'flash-outline' : 'fitness-outline' as keyof typeof Ionicons.glyphMap} 
-              size={20} 
-              color={color} 
-            />
-            <Text style={styles.micronutrientName}>{name}</Text>
-          </View>
-          <View style={styles.micronutrientContent}>
-            <Text style={styles.micronutrientAmount}>{amount}{unit}</Text>
-            <View style={styles.micronutrientProgressBar}>
-              <LinearGradient
-                colors={[color, color + '80']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[
-                  styles.progressBar,
-                  { width: `${Math.min(percentage, 100)}%` }
-                ]}
-              />
-            </View>
-            <Text style={styles.micronutrientPercentage}>{percentage}% DV</Text>
-          </View>
-        </LinearGradient>
-      </BlurView>
-    </Animated.View>
-  );
-};
-
-const HealthScoreCard = ({ score, factors }: { score: number; factors: string[] }) => {
-  const color = score >= 7 ? '#10B981' : score >= 4 ? '#F59E0B' : '#EF4444';
-  
-  return (
-    <Animated.View entering={FadeInUp.delay(200)} style={styles.healthScoreCard}>
-      <BlurView intensity={20} style={styles.cardBlur}>
-        <LinearGradient
-          colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
-          style={styles.healthScoreGradient}
-        >
-          <View style={styles.healthScoreHeader}>
-            <Ionicons name={'heart-outline' as keyof typeof Ionicons.glyphMap} size={24} color={color} />
-            <Text style={styles.healthScoreTitle}>Nutrition Score</Text>
-          </View>
-          <View style={styles.healthScoreContent}>
-            <View style={[styles.scoreCircle, { borderColor: color }]}>
-              <Text style={[styles.scoreText, { color }]}>{score.toFixed(1)}</Text>
-              <Text style={styles.scoreMax}>/10</Text>
-            </View>
-            <View style={styles.factorsList}>
-              {factors.map((factor, index) => (
-                <View key={index} style={styles.factorItem}>
-                  <Ionicons name={'checkmark-circle-outline' as keyof typeof Ionicons.glyphMap} size={16} color={color} />
-                  <Text style={styles.factorText}>{factor}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </LinearGradient>
-      </BlurView>
-    </Animated.View>
   );
 };
 
@@ -2021,25 +2064,21 @@ const styles = StyleSheet.create({
   },
   statsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
+    marginTop: 16,
   },
   statItem: {
-    flex: 1,
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 8,
-  },
-  statValue: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '700',
-    marginVertical: 8,
+    gap: 8,
   },
   statLabel: {
-    color: '#9CA3AF',
     fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
   caloriesCard: {
     height: 150,
@@ -2204,7 +2243,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   nutrientTarget: {
-    color: '#9CA3AF',
+    color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
   },
   legendTextContainer: {
@@ -2408,15 +2447,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     overflow: 'hidden',
   },
-  nutrientProgressBar: {
-    height: '100%',
-    backgroundColor: '#14B8A6',
-    borderRadius: 2,
-  },
-  nutrientTarget: {
-    color: '#9CA3AF',
-    fontSize: 12,
-  },
   trendsContainer: {
     flex: 1,
   },
@@ -2475,6 +2505,7 @@ const styles = StyleSheet.create({
   nutrientAmount: {
     color: '#E0E0E0',
     fontSize: 14,
+    fontWeight: '600',
   },
   nutrientGoal: {
     color: '#9CA3AF',
@@ -2549,6 +2580,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   caloriePercentage: {
+    marginLeft: 'auto',
     fontSize: 20,
     fontWeight: '700',
   },
@@ -2640,7 +2672,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   micronutrientSection: {
-    marginTop: 16,
+    marginTop: 24,
+    marginBottom: 24,
   },
   sectionSubtitle: {
     color: '#FFFFFF',
@@ -2743,10 +2776,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mealTimingTime: {
-    color: '#4C6EF5',
-    fontSize: 18,
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   mealTimingReason: {
     color: '#9CA3AF',
@@ -2846,185 +2879,6 @@ const styles = StyleSheet.create({
     // Define your chart style here
     marginVertical: 8,
     borderRadius: 16,
-  },
-  micronutrientCard: {
-    marginVertical: 8,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  micronutrientGradient: {
-    padding: 16,
-    borderRadius: 16,
-  },
-  micronutrientHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  micronutrientName: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  micronutrientContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  micronutrientAmount: {
-    color: '#fff',
-    fontSize: 14,
-    width: 80,
-  },
-  micronutrientProgressBar: {
-    flex: 1,
-    height: 6,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 3,
-    marginHorizontal: 12,
-    overflow: 'hidden',
-  },
-  micronutrientPercentage: {
-    color: '#fff',
-    fontSize: 14,
-    width: 60,
-    textAlign: 'right',
-  },
-  healthScoreCard: {
-    marginVertical: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  healthScoreGradient: {
-    padding: 20,
-    borderRadius: 16,
-  },
-  healthScoreHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  healthScoreTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  healthScoreContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  scoreCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  scoreText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  scoreMax: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-  },
-  factorsList: {
-    flex: 1,
-  },
-  factorItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  factorText: {
-    color: '#fff',
-    fontSize: 14,
-    marginLeft: 8,
-    flex: 1,
-  },
-  micronutrientsSection: {
-    marginTop: 16,
-  },
-  macronutrientsSection: {
-    marginTop: 16,
-  },
-  macronutrientItem: {
-    marginVertical: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 16,
-  },
-  macronutrientHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  macronutrientIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  macronutrientName: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-  },
-  macronutrientPercentage: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  macronutrientProgressBar: {
-    height: 6,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  macronutrientDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  macronutrientAmount: {
-    color: '#fff',
-    fontSize: 14,
-  },
-  macronutrientGoal: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 14,
-  },
-  mealTimingSection: {
-    marginBottom: 24,
-  },
-  mealTimingCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-  },
-  mealTimingContent: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  mealTimingTime: {
-    color: '#4C6EF5',
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  mealTimingReason: {
-    color: '#9CA3AF',
-    fontSize: 14,
   },
 });
 
@@ -3300,168 +3154,168 @@ export default function NutritionAnalyzer() {
             </View>
           </View>
         </View>
-          <ScrollView 
-            style={styles.content}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {showDashboard ? (
-              <NutritionVisualization result={result} dailyProgress={dailyProgress} />
-            ) : (
-              <>
-                <View style={styles.inputSection}>
-                  <View style={styles.imageInputs}>
-                    <TouchableOpacity
-                      style={styles.imageButton}
-                      onPress={takePhoto}
+        <ScrollView 
+          style={styles.content}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {showDashboard ? (
+            <NutritionVisualization result={result} dailyProgress={dailyProgress} />
+          ) : (
+            <>
+              <View style={styles.inputSection}>
+                <View style={styles.imageInputs}>
+                  <TouchableOpacity
+                    style={styles.imageButton}
+                    onPress={takePhoto}
+                  >
+                    <LinearGradient
+                      colors={['#4C6EF5', '#3D5AFE']}
+                      style={styles.buttonGradient}
                     >
-                      <LinearGradient
-                        colors={['#4C6EF5', '#3D5AFE']}
-                        style={styles.buttonGradient}
-                      >
-                        <Ionicons name="camera-outline" size={24} color="#fff" />
-                        <Text style={styles.buttonText}>Take Photo</Text>
-                      </LinearGradient>
-                    </TouchableOpacity>
+                      <Ionicons name="camera-outline" size={24} color="#fff" />
+                      <Text style={styles.buttonText}>Take Photo</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={styles.imageButton}
-                      onPress={pickImage}
+                  <TouchableOpacity
+                    style={styles.imageButton}
+                    onPress={pickImage}
+                  >
+                    <LinearGradient
+                      colors={['#4C6EF5', '#3D5AFE']}
+                      style={styles.buttonGradient}
                     >
-                      <LinearGradient
-                        colors={['#4C6EF5', '#3D5AFE']}
-                        style={styles.buttonGradient}
-                      >
-                        <Ionicons name="images-outline" size={24} color="#fff" />
-                        <Text style={styles.buttonText}>Pick Image</Text>
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  </View>
-
-                  <Text style={styles.orText}>OR</Text>
-
-                  <View style={styles.textInputContainer}>
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="Describe your food..."
-                      placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                      value={textInput}
-                      onChangeText={handleTextChange}
-                      multiline
-                      returnKeyType="done"
-                    />
-                    <TouchableOpacity
-                      style={[styles.submitButton, !textInput.trim() && styles.submitButtonDisabled]}
-                      onPress={() => debouncedAnalyzeText(textInput)}
-                      disabled={!textInput.trim() || isLoading}
-                    >
-                      <LinearGradient
-                        colors={textInput.trim() ? ['#4C6EF5', '#3D5AFE'] : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.1)']}
-                        style={styles.submitButtonGradient}
-                      >
-                        <Ionicons
-                          name="arrow-forward-outline"
-                          size={24}
-                          color={textInput.trim() ? '#fff' : '#6B7280'}
-                        />
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  </View>
+                      <Ionicons name="images-outline" size={24} color="#fff" />
+                      <Text style={styles.buttonText}>Pick Image</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
                 </View>
 
-                {image && (
-                  <MotiView
-                    from={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ type: 'timing', duration: 300 }}
-                    style={styles.imagePreview}
-                  >
-                    <Image source={{ uri: image }} style={styles.previewImage} />
-                  </MotiView>
-                )}
+                <Text style={styles.orText}>OR</Text>
 
-                {isLoading && (
-                  <MotiView
-                    from={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ type: 'timing', duration: 300 }}
-                    style={styles.loadingContainer}
+                <View style={styles.textInputContainer}>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Describe your food..."
+                    placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                    value={textInput}
+                    onChangeText={handleTextChange}
+                    multiline
+                    returnKeyType="done"
+                  />
+                  <TouchableOpacity
+                    style={[styles.submitButton, !textInput.trim() && styles.submitButtonDisabled]}
+                    onPress={() => debouncedAnalyzeText(textInput)}
+                    disabled={!textInput.trim() || isLoading}
                   >
-                    <ActivityIndicator size="large" color="#4F46E5" />
-                    <Text style={styles.loadingText}>Analyzing nutrition...</Text>
-                  </MotiView>
-                )}
+                    <LinearGradient
+                      colors={textInput.trim() ? ['#4C6EF5', '#3D5AFE'] : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.1)']}
+                      style={styles.submitButtonGradient}
+                    >
+                      <Ionicons
+                        name="arrow-forward-outline"
+                        size={24}
+                        color={textInput.trim() ? '#fff' : '#6B7280'}
+                      />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </View>
 
-                {result && !showDashboard && (
-                  <MotiView
-                    from={{ opacity: 0, translateY: 20 }}
-                    animate={{ opacity: 1, translateY: 0 }}
-                    transition={{ type: 'timing', duration: 300 }}
-                    style={styles.resultContainer}
-                  >
-                    <View style={styles.resultHeader}>
-                      <View style={styles.resultTitleRow}>
-                        <Text style={styles.foodName}>{result.basic_info.food_name}</Text>
-                        <TouchableOpacity
-                          style={styles.closeButton}
-                          onPress={resetAnalysis}
-                        >
-                          <Ionicons name="close-circle" size={24} color="rgba(255, 255, 255, 0.7)" />
-                        </TouchableOpacity>
-                      </View>
-                      <Text style={styles.mealType}>
-                        <Ionicons name="time" size={16} color="#4C6EF5" /> {result.meal_type}
+              {image && (
+                <MotiView
+                  from={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: 'timing', duration: 300 }}
+                  style={styles.imagePreview}
+                >
+                  <Image source={{ uri: image }} style={styles.previewImage} />
+                </MotiView>
+              )}
+
+              {isLoading && (
+                <MotiView
+                  from={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: 'timing', duration: 300 }}
+                  style={styles.loadingContainer}
+                >
+                  <ActivityIndicator size="large" color="#4C6EF5" />
+                  <Text style={styles.loadingText}>Analyzing nutrition...</Text>
+                </MotiView>
+              )}
+
+              {result && !showDashboard && (
+                <MotiView
+                  from={{ opacity: 0, translateY: 20 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={{ type: 'timing', duration: 300 }}
+                  style={styles.resultContainer}
+                >
+                  <View style={styles.resultHeader}>
+                    <View style={styles.resultTitleRow}>
+                      <Text style={styles.foodName}>{result.basic_info.food_name}</Text>
+                      <TouchableOpacity
+                        style={styles.closeButton}
+                        onPress={resetAnalysis}
+                      >
+                        <Ionicons name="close-circle" size={24} color="rgba(255, 255, 255, 0.7)" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.mealType}>
+                      <Ionicons name="time" size={16} color="#4C6EF5" /> {result.meal_type}
+                    </Text>
+                    {result.basic_info.portion_size && (
+                      <Text style={styles.portionSize}>
+                        <Ionicons name="restaurant" size={16} color="rgba(255, 255, 255, 0.7)" /> {result.basic_info.portion_size}
                       </Text>
-                      {result.basic_info.portion_size && (
-                        <Text style={styles.portionSize}>
-                          <Ionicons name="restaurant" size={16} color="rgba(255, 255, 255, 0.7)" /> {result.basic_info.portion_size}
-                        </Text>
+                    )}
+                  </View>
+
+                  {result.health_analysis && (
+                    <View style={styles.healthAnalysis}>
+                      <Text style={styles.sectionTitle}>
+                        <Ionicons name={'medical-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#fff" /> Health Analysis
+                      </Text>
+                      {result.health_analysis.benefits.length > 0 && (
+                        <View style={styles.benefitsContainer}>
+                          <Text style={styles.benefitsTitle}>
+                            <Ionicons name="checkmark-circle" size={18} color="#4C6EF5" /> Benefits
+                          </Text>
+                          {result.health_analysis.benefits.map((benefit, index) => (
+                            <Text key={index} style={styles.benefitItem}>• {benefit}</Text>
+                          ))}
+                        </View>
+                      )}
+                      {result.health_analysis.considerations.length > 0 && (
+                        <View style={styles.considerationsContainer}>
+                          <Text style={styles.considerationsTitle}>
+                            <Ionicons name="information-circle" size={18} color="#4C6EF5" /> Considerations
+                          </Text>
+                          {result.health_analysis.considerations.map((consideration, index) => (
+                            <Text key={index} style={styles.considerationItem}>• {consideration}</Text>
+                          ))}
+                        </View>
+                      )}
+                      {result.health_analysis.allergens.length > 0 && (
+                        <View style={styles.allergensContainer}>
+                          <Text style={styles.allergensTitle}>
+                            <Ionicons name="alert-circle" size={18} color="#4C6EF5" /> Allergens
+                          </Text>
+                          {result.health_analysis.allergens.map((allergen, index) => (
+                            <Text key={index} style={styles.allergenItem}>• {allergen}</Text>
+                          ))}
+                        </View>
                       )}
                     </View>
-
-                    {result.health_analysis && (
-                      <View style={styles.healthAnalysis}>
-                        <Text style={styles.sectionTitle}>
-                          <Ionicons name={'medical-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#fff" /> Health Analysis
-                        </Text>
-                        {result.health_analysis.benefits.length > 0 && (
-                          <View style={styles.benefitsContainer}>
-                            <Text style={styles.benefitsTitle}>
-                              <Ionicons name="checkmark-circle" size={18} color="#4C6EF5" /> Benefits
-                            </Text>
-                            {result.health_analysis.benefits.map((benefit, index) => (
-                              <Text key={index} style={styles.benefitItem}>• {benefit}</Text>
-                            ))}
-                          </View>
-                        )}
-                        {result.health_analysis.considerations.length > 0 && (
-                          <View style={styles.considerationsContainer}>
-                            <Text style={styles.considerationsTitle}>
-                              <Ionicons name="information-circle" size={18} color="#4C6EF5" /> Considerations
-                            </Text>
-                            {result.health_analysis.considerations.map((consideration, index) => (
-                              <Text key={index} style={styles.considerationItem}>• {consideration}</Text>
-                            ))}
-                          </View>
-                        )}
-                        {result.health_analysis.allergens.length > 0 && (
-                          <View style={styles.allergensContainer}>
-                            <Text style={styles.allergensTitle}>
-                              <Ionicons name="alert-circle" size={18} color="#4C6EF5" /> Allergens
-                            </Text>
-                            {result.health_analysis.allergens.map((allergen, index) => (
-                              <Text key={index} style={styles.allergenItem}>• {allergen}</Text>
-                            ))}
-                          </View>
-                        )}
-                      </View>
-                    )}
-                  </MotiView>
-                )}
-              </>
-            )}
-          </ScrollView>
-        </LinearGradient>
+                  )}
+                </MotiView>
+              )}
+            </>
+          )}
+        </ScrollView>
+      </LinearGradient>
       <NutritionGoalsModal
         visible={showGoalsModal}
         onClose={() => setShowGoalsModal(false)}

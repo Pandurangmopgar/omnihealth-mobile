@@ -24,11 +24,19 @@ const systemPrompt = `You are NutrInfo, a specialized AI for analyzing food desc
 For text descriptions:
 1. Parse the food description and quantity
 2. Calculate nutritional content based on standard portions
-3. Provide health insights and calculate health score
+3. Provide health insights
 4. Consider common preparation methods
 5. Suggest alternatives
 
+For food images:
+1. Identify the food and estimate portion size
+2. Calculate nutritional content
+3. Provide health insights
+4. Consider preparation method
+5. Suggest alternatives
+
 Return analysis in this exact JSON structure:
+
 {
   "analysis_type": "text" | "image",
   "basic_info": {
@@ -40,22 +48,44 @@ Return analysis in this exact JSON structure:
   "nutritional_content": {
     "calories": number,
     "macronutrients": {
-      "protein": { "amount": number, "unit": "g", "daily_value_percentage": number },
-      "carbs": { "amount": number, "unit": "g", "daily_value_percentage": number },
-      "fats": { "amount": number, "unit": "g", "daily_value_percentage": number }
+      "protein": {
+        "amount": number,
+        "unit": "g",
+        "daily_value_percentage": number | null
+      },
+      "carbs": {
+        "amount": number,
+        "unit": "g",
+        "daily_value_percentage": number | null
+      },
+      "fats": {
+        "amount": number,
+        "unit": "g",
+        "daily_value_percentage": number | null
+      }
     },
-    "micronutrients": {
-      "vitamins": [
-        { "name": string, "amount": number, "unit": string, "daily_value_percentage": number }
-      ],
-      "minerals": [
-        { "name": string, "amount": number, "unit": string, "daily_value_percentage": number }
-      ]
+    "vitamins_minerals": {
+      "[name]": {
+        "amount": number,
+        "unit": string,
+        "daily_value_percentage": number | null
+      }
+    },
+    "fiber": {
+      "amount": number,
+      "unit": "g",
+      "daily_value_percentage": number | null
+    },
+    "added_sugars": {
+      "amount": number,
+      "unit": "g",
+      "daily_value_percentage": number | null
     }
   },
   "health_analysis": {
     "health_score": {
       "score": number,
+      "explanation": string,
       "factors": string[]
     },
     "benefits": string[],
@@ -66,15 +96,12 @@ Return analysis in this exact JSON structure:
   "recommendations": {
     "serving_suggestions": string[],
     "healthier_alternatives": string[],
-    "local_options": string[],
-    "meal_timing": {
-      "best_time": string,
-      "reason": string
-    }
+    "local_options": string[]
   },
   "source_reliability": "verified" | "estimated",
-  "meal_type": "breakfast" | "lunch" | "dinner" | "snack"
-}`;
+  "meal_type": string
+}`
+
 
 interface NutritionAnalysis {
   analysis_type: 'text' | 'image';
@@ -82,39 +109,29 @@ interface NutritionAnalysis {
     food_name: string;
     portion_size: string;
     preparation_method: string;
-    total_servings: number;
   };
   nutritional_content: {
     calories: number;
     macronutrients: {
-      protein: { amount: number; unit: 'g'; daily_value_percentage: number };
-      carbs: { amount: number; unit: 'g'; daily_value_percentage: number };
-      fats: { amount: number; unit: 'g'; daily_value_percentage: number };
+      protein: NutrientInfo;
+      carbs: NutrientInfo;
+      fats: NutrientInfo;
     };
-    micronutrients: {
-      vitamins: Array<{
-        name: string;
-        amount: number;
-        unit: string;
-        daily_value_percentage: number;
-      }>;
-      minerals: Array<{
-        name: string;
-        amount: number;
-        unit: string;
-        daily_value_percentage: number;
-      }>;
+    vitamins_minerals: {
+      [key: string]: NutrientInfo;
     };
+    fiber: NutrientInfo;
+    added_sugars: NutrientInfo;
   };
   health_analysis: {
     health_score: {
       score: number;
+      explanation: string;
       factors: string[];
     };
     benefits: string[];
     considerations: string[];
     allergens: string[];
-    processing_level: string;
   };
   recommendations: {
     serving_suggestions: string[];
@@ -127,6 +144,12 @@ interface NutritionAnalysis {
   };
   source_reliability: 'verified' | 'estimated';
   meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+}
+
+interface NutrientInfo {
+  amount: number;
+  unit: string;
+  daily_value_percentage: number | null;
 }
 
 interface MealTiming {
