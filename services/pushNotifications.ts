@@ -774,7 +774,15 @@ Consider:
 3. If close to goals, give specific tips
 4. Keep message concise and actionable
 
-Format: Return only the notification text, no quotes or formatting.`;
+Add emojis to enhance the message:
+- Use motivational emojis (💪, 🎯, 🚀) for encouragement
+- Use celebratory emojis (🌟, 🎉, 🏆) for achievements
+- Use food emojis (🥗, 🍽️, 🥑) for meal-related content
+- Use time-based emojis (🌅, ☀️, 🌙) based on time of day
+- Place emojis naturally within the text
+- Add 2-3 relevant emojis that match the message tone
+
+Format: Return only the notification text with naturally integrated emojis, no quotes or formatting.`;
 
     const result = await model.generateContent(prompt);
     const message = result.response.text();
