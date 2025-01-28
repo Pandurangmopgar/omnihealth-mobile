@@ -769,5 +769,6 @@ export {
   getDefaultGoals,
   generateNutritionReport,
   calculateOptimalReminders,
-  checkNutritionGoals
+  checkNutritionGoals,
+  NutritionProgress
 };

@@ -10,8 +10,16 @@ import {
   TimeIntervalTriggerInput,
   DailyTriggerInput,
   AndroidNotificationPriority,
-  SchedulableTriggerInputTypes
+  SchedulableTriggerInputTypes,
+  NotificationContentInput,
+  IosNotificationPermissionsRequest
 } from 'expo-notifications';
+import { 
+  getDailyProgress, 
+  getDailyGoals,
+  type NutritionProgress
+} from './nutritionAnalyzer';
+import { fetchUserNutritionGoals, NutritionGoals } from './nutritionGoals';
 
 // Initialize Redis client
 const redis = new Redis({
@@ -80,6 +88,39 @@ interface ReminderSettings {
   time: { hour: number; minute: number };
 }
 
+interface ProgressContext {
+  progress: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    meals_logged: number;
+  };
+  goals: {
+    daily_calories: number;
+    daily_protein: number;
+    daily_carbs: number;
+    daily_fat: number;
+  };
+  timeOfDay: string;
+  lastMealTime?: string;
+}
+
+interface NotificationData {
+  type: 'meal_reminder' | 'progress_check' | 'debug_test';
+  userId: string;
+  mealType?: string;
+  checkTime?: string;
+}
+
+interface ScheduledNotificationInfo {
+  identifier: string;
+  scheduledAt: string;
+  type: 'meal_reminder' | 'progress_check';
+  time?: { hour: number; minute: number };
+  meal?: string;
+}
+
 const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
 const MAX_NOTIFICATIONS_PER_WINDOW = 10;
 
@@ -88,6 +129,15 @@ const DEFAULT_REMINDERS: ReminderSettings[] = [
   { meal: 'breakfast', time: { hour: 8, minute: 0 } },
   { meal: 'lunch', time: { hour: 13, minute: 0 } },
   { meal: 'dinner', time: { hour: 19, minute: 0 } }
+];
+
+const PROGRESS_CHECK_TIMES = [
+  { hour: 10, minute: 0 },  // 10 AM
+  { hour: 12, minute: 0 },  // 12 PM
+  { hour: 14, minute: 0 },  // 2 PM
+  { hour: 17, minute: 0 },  // 5 PM
+  { hour: 19, minute: 0 },  // 7 PM
+  { hour: 21, minute: 0 },  // 9 PM
 ];
 
 export async function registerForPushNotifications(userId: string) {
@@ -101,7 +151,7 @@ export async function registerForPushNotifications(userId: string) {
           allowAlert: true,
           allowBadge: true,
           allowSound: true,
-        },
+        } as IosNotificationPermissionsRequest,
       });
       finalStatus = status;
     }
@@ -109,25 +159,35 @@ export async function registerForPushNotifications(userId: string) {
     if (finalStatus !== 'granted') {
       throw new Error('Permission not granted for notifications');
     }
-
+    
     const expoPushToken = await Notifications.getExpoPushTokenAsync({
-      projectId: process.env.EXPO_PROJECT_ID!,
+      projectId: process.env.EXPO_PUBLIC_PROJECT_ID,
     });
-
-    // Store token in Redis
+    
     const tokenData: NotificationToken = {
       token: expoPushToken.data,
       platform: Platform.OS === 'ios' ? 'ios' : 'android',
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: new Date().toISOString()
     };
 
-    const hashData: RedisHashData = {
-      token: JSON.stringify(tokenData)
-    };
-    await redis.hset(`user:${userId}:notifications`, hashData);
+    // Check and clear any existing data with wrong type
+    const tokenKey = `user:${userId}:notifications`;
+    const exists = await redis.exists(tokenKey);
+    if (exists === 1) {
+      const keyType = await redis.type(tokenKey);
+      if (keyType !== 'hash') {
+        await redis.del(tokenKey);
+      }
+    }
 
-    // Configure for iOS
-    if (Platform.OS === 'ios') {
+    // Store token data as hash
+    await redis.hmset(tokenKey, {
+      token: tokenData.token,
+      platform: tokenData.platform,
+      lastUpdated: tokenData.lastUpdated
+    });
+    
+    if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
         name: 'default',
         importance: Notifications.AndroidImportance.MAX,
@@ -177,7 +237,7 @@ async function getUserTimezone(userId: string): Promise<string> {
   }
 }
 
-async function generateNotificationContent(userId: string, mealType: string, progress: any) {
+async function generateNotificationContent(userId: string, mealType: string, progress: NutritionProgress | null) {
   // Get timezone based on user's location
   const userTimezone = await getUserTimezone(userId);
   const now = moment().tz(userTimezone);
@@ -188,7 +248,7 @@ async function generateNotificationContent(userId: string, mealType: string, pro
 
   // Get user's location for more contextual messages
   const { data: userData } = await supabase
-    .from('medipredict_users')  // Using the correct table name
+    .from('medipredict_users')
     .select('location')
     .eq('id', userId)
     .single();
@@ -389,35 +449,63 @@ async function scheduleProgressNotifications(userId: string) {
   try {
     console.log('Scheduling progress notification for user:', userId);
     
+    // Schedule the enhanced notifications first
+    await scheduleEnhancedProgressNotifications(userId);
+    
     const trigger: TimeIntervalTriggerInput = {
-      seconds: 3600, // Check every hour
+      seconds: 3600,
       repeats: true,
       type: SchedulableTriggerInputTypes.TIME_INTERVAL
     };
 
+    const content: NotificationContentInput = {
+      title: 'Nutrition Progress Update',
+      body: 'Time to check your nutrition progress!',
+      data: { 
+        type: 'progress_check' as const,
+        userId 
+      } as NotificationData,
+      priority: AndroidNotificationPriority.DEFAULT,
+    };
+
     const identifier = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Nutrition Progress Update',
-        body: 'Time to check your nutrition progress!',
-        data: { type: 'progress_check', userId },
-        priority: AndroidNotificationPriority.DEFAULT,
-      },
+      content,
       trigger,
     });
 
     console.log('Progress notification scheduled with identifier:', identifier);
     
-    // Store scheduled notification info in Redis for tracking
-    await redis.hset(`user:${userId}:scheduled_notifications`, {
-      progress_check: JSON.stringify({
-        identifier,
-        scheduledAt: new Date().toISOString(),
-        type: 'progress_check'
-      })
+    const notificationKey = `user:${userId}:scheduled_notifications:progress_check`;
+    const notificationData = JSON.stringify({
+      identifier,
+      scheduledAt: new Date().toISOString(),
+      type: 'progress_check'
     });
+    
+    await redis.set(notificationKey, notificationData);
 
   } catch (error) {
     console.error('Error scheduling progress notification:', error);
+  }
+}
+
+async function storeNotificationSettings(userId: string, settings: ReminderSettings[]): Promise<void> {
+  try {
+    const settingsKey = `user:${userId}:settings`;
+    const exists = await redis.exists(settingsKey);
+    if (exists === 1) {
+      const keyType = await redis.type(settingsKey);
+      if (keyType !== 'hash') {
+        await redis.del(settingsKey);
+      }
+    }
+
+    const remindersJson = JSON.stringify(settings);
+    const result = await redis.set(settingsKey, remindersJson);
+    
+  } catch (error) {
+    console.error('Error storing notification settings:', error);
+    throw new Error('Failed to store notification settings');
   }
 }
 
@@ -442,12 +530,10 @@ async function scheduleNutritionReminders(userId: string, reminders?: ReminderSe
     await Notifications.cancelAllScheduledNotificationsAsync();
     console.log('Cancelled existing notifications');
 
-    // Store the reminder settings in Redis for future reference
-    await redis.hset(`user:${userId}:settings`, {
-      reminders: JSON.stringify(reminderSettings),
-      lastUpdated: new Date().toISOString()
-    });
+    // Store the reminder settings
+    await storeNotificationSettings(userId, reminderSettings);
 
+    // Schedule each reminder
     for (const reminder of reminderSettings) {
       const { meal, time } = reminder;
       console.log(`Scheduling reminder for ${meal} at ${time.hour}:${time.minute}`);
@@ -466,32 +552,39 @@ async function scheduleNutritionReminders(userId: string, reminders?: ReminderSe
       const notificationBody = await generateNotificationContent(userId, meal, null);
       console.log(`Generated notification content for ${meal}:`, notificationBody);
 
+      const content: NotificationContentInput = {
+        title: 'Meal Time Reminder',
+        body: notificationBody,
+        data: { 
+          type: 'meal_reminder' as const,
+          userId,
+          mealType: meal
+        } as NotificationData,
+        priority: AndroidNotificationPriority.HIGH,
+      };
+
       const identifier = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Meal Time Reminder',
-          body: notificationBody,
-          data: { type: 'meal_reminder', meal, userId },
-          priority: AndroidNotificationPriority.HIGH,
-        },
+        content,
         trigger,
       });
 
       console.log(`Successfully scheduled ${meal} reminder with identifier:`, identifier);
       
       // Store scheduled notification info
-      await redis.hset(`user:${userId}:scheduled_notifications`, {
-        [`meal_${meal}`]: JSON.stringify({
-          identifier,
-          scheduledAt: new Date().toISOString(),
-          type: 'meal_reminder',
-          meal,
-          time
-        })
+      const notificationKey = `user:${userId}:scheduled_notifications:meal_${meal}`;
+      const notificationData = JSON.stringify({
+        identifier,
+        scheduledAt: new Date().toISOString(),
+        type: 'meal_reminder',
+        meal,
+        time
       });
+      
+      await redis.set(notificationKey, notificationData);
       console.log(`Stored notification info in Redis for ${meal}`);
     }
 
-    // Schedule progress notifications as well
+    // Schedule progress notifications
     await scheduleProgressNotifications(userId);
     
     // Verify scheduled notifications
@@ -500,69 +593,20 @@ async function scheduleNutritionReminders(userId: string, reminders?: ReminderSe
 
   } catch (error) {
     console.error('Error scheduling nutrition reminders:', error);
-    // Re-throw the error to handle it in the calling function
     throw error;
   }
 }
 
-async function getNotificationAnalytics(userId: string, days: number = 7) {
+async function getNotificationAnalytics(userId: string) {
   try {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    
-    // Get notifications in date range using zrange with scores
-    const notifications = await redis.zrange(
-      `user:${userId}:notifications`,
-      startDate.getTime().toString(),
-      endDate.getTime().toString(),
-      { 
-        byScore: true,
-        rev: true 
-      }
-    );
-    
-    // Get notification details
-    const notificationDetails = await Promise.all(
-      (notifications as string[]).map(key => redis.hgetall(key))
-    );
-    
-    // Get daily stats
-    const stats: Record<string, {
-      total: number;
-      byType: {
-        meal_reminder: number;
-        progress_check: number;
-      };
-    }> = {};
-
-    for (let d = 0; d < days; d++) {
-      const date = new Date(endDate);
-      date.setDate(date.getDate() - d);
-      const dateStr = date.toISOString().split('T')[0];
-      
-      const [dailyCount, mealReminderCount, progressCheckCount] = await Promise.all([
-        redis.hget(`user:${userId}:notification_stats`, `count:${dateStr}`) as Promise<string>,
-        redis.hget(`user:${userId}:notification_stats`, `type:meal_reminder:${dateStr}`) as Promise<string>,
-        redis.hget(`user:${userId}:notification_stats`, `type:progress_check:${dateStr}`) as Promise<string>
-      ]);
-      
-      stats[dateStr] = {
-        total: parseInt(dailyCount || '0'),
-        byType: {
-          meal_reminder: parseInt(mealReminderCount || '0'),
-          progress_check: parseInt(progressCheckCount || '0')
-        }
-      };
-    }
-    
-    return {
-      notifications: notificationDetails,
-      dailyStats: stats
-    };
+    const notificationsKey = `user:${userId}:notifications`;
+    const min = 0;
+    const max = -1;
+    const result = await redis.zrange(notificationsKey, min, max);
+    return result;
   } catch (error) {
     console.error('Error getting notification analytics:', error);
-    return null;
+    return [];
   }
 }
 
@@ -581,7 +625,7 @@ async function checkNotificationStatus(userId: string): Promise<{
     console.log('Currently scheduled notifications:', scheduled);
 
     // Get stored notification info from Redis
-    const storedNotifications = await redis.hgetall(`user:${userId}:scheduled_notifications`);
+    const storedNotifications = await redis.keys(`user:${userId}:scheduled_notifications:*`);
     console.log('Stored notification info:', storedNotifications);
 
     // Get recent notification history
@@ -656,7 +700,10 @@ async function debugNotifications(userId: string): Promise<{
       content: {
         title: 'Debug Test Notification',
         body: `This is a test notification sent at ${new Date().toLocaleTimeString()}`,
-        data: { type: 'debug_test', userId },
+        data: { 
+          type: 'debug_test',
+          userId,
+        } as NotificationData,
       },
       trigger: {
         seconds: 5,
@@ -688,14 +735,124 @@ async function debugNotifications(userId: string): Promise<{
   }
 }
 
-export {
-  scheduleNutritionReminders,
-  scheduleProgressNotifications,
-  getNotificationAnalytics,
-  checkNotificationStatus,
-  debugNotifications,
-  storeNotificationHistory
-};
+async function generateProgressNotification(userId: string): Promise<string> {
+  try {
+    // Get progress and goals separately from their respective services
+    const dailyData = await getDailyProgress(userId);
+    const { progress } = dailyData;
+    const goals = await fetchUserNutritionGoals(userId);
+    
+    if (!goals) {
+      console.error('No nutrition goals found for user:', userId);
+      return getDefaultProgressMessage(0);
+    }
+
+    const now = new Date();
+    const hour = now.getHours();
+    
+    let timeOfDay = 'morning';
+    if (hour >= 12 && hour < 17) timeOfDay = 'afternoon';
+    else if (hour >= 17) timeOfDay = 'evening';
+
+    // Calculate percentages using the correct goals
+    const caloriePercentage = Math.round((progress.calories / goals.daily_calories) * 100);
+    const proteinPercentage = Math.round((progress.protein / goals.daily_protein) * 100);
+    const carbsPercentage = Math.round((progress.carbs / goals.daily_carbs) * 100);
+    const fatPercentage = Math.round((progress.fat / goals.daily_fat) * 100);
+    
+    let prompt = `Generate a personalized nutrition progress notification. Context:
+    - Time of day: ${timeOfDay}
+    - Calories: ${progress.calories}/${goals.daily_calories} (${caloriePercentage}%)
+    - Protein: ${progress.protein}/${goals.daily_protein}g (${proteinPercentage}%)
+    - Carbs: ${progress.carbs}/${goals.daily_carbs}g (${carbsPercentage}%)
+    - Fat: ${progress.fat}/${goals.daily_fat}g (${fatPercentage}%)
+    - Meals logged today: ${progress.meals_logged}
+
+Consider:
+1. If progress is low, encourage in a friendly way
+2. If progress is good, celebrate and motivate
+3. If close to goals, give specific tips
+4. Keep message concise and actionable
+
+Format: Return only the notification text, no quotes or formatting.`;
+
+    const result = await model.generateContent(prompt);
+    const message = result.response.text();
+    return message || getDefaultProgressMessage(progress.meals_logged);
+  } catch (error) {
+    console.error('Error generating progress notification:', error);
+    return getDefaultProgressMessage(0);
+  }
+}
+
+async function scheduleEnhancedProgressNotifications(userId: string): Promise<void> {
+  try {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    // Schedule fixed-time notifications
+    for (const time of PROGRESS_CHECK_TIMES) {
+      // Only schedule notifications for times that haven't passed yet
+      if (time.hour > currentHour || (time.hour === currentHour && time.minute > currentMinute)) {
+        const notificationContent = await generateProgressNotification(userId);
+        const trigger: DailyTriggerInput = {
+          hour: time.hour,
+          minute: time.minute,
+          type: SchedulableTriggerInputTypes.DAILY
+        };
+        
+        const identifier = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Nutrition Progress Update',
+            body: notificationContent,
+            data: { 
+              type: 'progress_check' as const,
+              userId,
+              checkTime: `${time.hour}:${time.minute}`
+            } as NotificationData,
+            priority: AndroidNotificationPriority.DEFAULT,
+          },
+          trigger,
+        });
+
+        // Store notification info in Redis
+        const notificationInfo = JSON.stringify({
+          identifier,
+          scheduledAt: new Date().toISOString(),
+          type: 'progress_check',
+          checkTime: `${time.hour}:${time.minute}`
+        });
+
+        await redis.set(`user:${userId}:scheduled_notifications:progress_check_${time.hour}_${time.minute}`, notificationInfo);
+
+      }
+    }
+
+  } catch (error) {
+    console.error('Error scheduling enhanced progress notifications:', error);
+    // Don't throw error to maintain existing behavior
+  }
+}
+
+async function getLastNotifications(userId: string, count: number = 10) {
+  const notificationsKey = `user:${userId}:notifications`;
+  const notifications = await redis.zrange(notificationsKey, 0, count - 1, {
+    rev: true,
+    withScores: true
+  });
+  return notifications;
+}
+
+function getDefaultProgressMessage(mealsLogged: number): string {
+  if (mealsLogged === 0) {
+    return "Don't forget to log your meals today! Tracking helps you stay on top of your nutrition goals. 🍽️";
+  } else if (mealsLogged < 3) {
+    return `Great start with ${mealsLogged} meal${mealsLogged > 1 ? 's' : ''} logged! Keep going to reach your daily goals. 💪`;
+  } else {
+    return "Amazing job tracking your nutrition today! Keep up the great work! 🌟";
+  }
+}
 
 function getDefaultMessage(timeContext: string, mealType: string, now: moment.Moment): string {
   const messages = {
@@ -789,3 +946,12 @@ Notifications.addNotificationResponseReceivedListener((response) => {
     // Navigation logic will be handled by the app navigation system
   }
 });
+
+export {
+  scheduleNutritionReminders,
+  scheduleProgressNotifications,
+  getNotificationAnalytics,
+  checkNotificationStatus,
+  debugNotifications,
+  storeNotificationHistory
+};
