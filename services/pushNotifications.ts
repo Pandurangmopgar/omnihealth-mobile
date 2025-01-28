@@ -300,21 +300,37 @@ async function storeNotificationHistory(notification: NotificationHistory): Prom
     const timestamp = new Date(notification.sentAt).getTime();
     const notificationKey = `notification:${notification.id}`;
     
-    // First delete any existing keys to avoid WRONGTYPE errors
-    await redis.del(notificationKey);
+    // First check if key exists and its type
+    const keyExists = await redis.exists(notificationKey);
+    if (keyExists) {
+      // Delete the key regardless of type to avoid WRONGTYPE errors
+      await redis.del(notificationKey);
+    }
     
     // Store full notification data as hash
-    await redis.hmset(notificationKey, {
+    const notificationData = {
       id: notification.id,
       userId: notification.userId,
       type: notification.type,
       sentAt: notification.sentAt,
       metadata: JSON.stringify(notification.metadata),
       content: JSON.stringify(notification.content)
-    });
+    };
+    
+    await redis.hmset(notificationKey, notificationData);
     
     // Add to user's notification list (sorted set)
     const notificationsKey = `user:${notification.userId}:notifications`;
+    
+    // Check and delete if wrong type
+    const notificationsKeyExists = await redis.exists(notificationsKey);
+    if (notificationsKeyExists) {
+      const type = await redis.type(notificationsKey);
+      if (type !== 'zset') {
+        await redis.del(notificationsKey);
+      }
+    }
+    
     await redis.zadd(notificationsKey, {
       score: timestamp,
       member: notificationKey
@@ -339,12 +355,22 @@ async function storeNotificationHistory(notification: NotificationHistory): Prom
     const today = new Date().toISOString().split('T')[0];
     const statsKey = `user:${notification.userId}:notification_stats:${today}`;
     
+    // Check and delete if wrong type
+    const statsKeyExists = await redis.exists(statsKey);
+    if (statsKeyExists) {
+      const type = await redis.type(statsKey);
+      if (type !== 'hash') {
+        await redis.del(statsKey);
+      }
+    }
+    
     // Initialize or update stats
-    await redis.del(statsKey); // Clear any existing wrong type
-    await redis.hmset(statsKey, {
+    const statsData = {
       count: '0',
       [`type:${notification.type}`]: '0'
-    });
+    };
+    
+    await redis.hmset(statsKey, statsData);
     
     // Increment counters
     await redis.hincrby(statsKey, 'count', 1);
@@ -355,7 +381,7 @@ async function storeNotificationHistory(notification: NotificationHistory): Prom
 
   } catch (error) {
     console.error('Error storing notification history:', error);
-    // Don't throw the error as this is not critical for notification delivery
+    throw new Error('Failed to store notification history. Please try again later.');
   }
 }
 

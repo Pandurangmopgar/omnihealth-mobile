@@ -607,11 +607,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
           entering={FadeInUp.duration(600).springify()}
           style={styles.reportContent}
         >
-          <BlurView intensity={80} style={styles.reportCard}>
-            <View style={styles.reportHeader}>
-              <Ionicons name="nutrition" size={24} color="#4F46E5" />
-              <Text style={styles.reportTitle}>Nutrition Report</Text>
-            </View>
+          <BlurView intensity={40} tint="dark" style={styles.reportCard}>
             <View style={styles.reportBody}>
               {formatAIResponse(reportState.report)}
             </View>
@@ -624,7 +620,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                 onPress={generateReport}
                 disabled={reportState.remainingReports === 0}
               >
-                <Ionicons name="refresh" size={20} color="#FFFFFF" />
+                <Ionicons name="refresh-circle" size={24} color="#FFFFFF" />
                 <Text style={styles.generateButtonText}>Generate New Report</Text>
               </TouchableOpacity>
             )}
@@ -635,13 +631,13 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
           entering={FadeInUp.duration(400)}
           style={styles.loadingContainer}
         >
-          <Ionicons name="alert-circle" size={32} color="#EF4444" />
+          <Ionicons name="alert-circle" size={40} color="#EF4444" />
           <Text style={styles.errorText}>{reportState.error}</Text>
           <TouchableOpacity
             style={styles.generateButton}
             onPress={generateReport}
           >
-            <Ionicons name="refresh" size={20} color="#FFFFFF" />
+            <Ionicons name="refresh-circle" size={24} color="#FFFFFF" />
             <Text style={styles.generateButtonText}>Try Again</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -650,7 +646,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
           entering={FadeInUp.duration(600)}
           style={styles.loadingContainer}
         >
-          <Ionicons name="document-text" size={64} color="#4F46E5" />
+          <Ionicons name="newspaper" size={72} color="#4F46E5" />
           <Text style={styles.loadingText}>
             Generate your first nutrition report of the day
           </Text>
@@ -658,7 +654,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
             style={styles.generateButton}
             onPress={generateReport}
           >
-            <Ionicons name="add-circle" size={24} color="#FFFFFF" />
+            <Ionicons name="analytics" size={24} color="#FFFFFF" />
             <Text style={styles.generateButtonText}>Generate Nutrition Report</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -2366,7 +2362,7 @@ const styles = StyleSheet.create({
   },
   reportContainer: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#0F172A',
     padding: 16,
   },
   reportContent: {
@@ -2375,44 +2371,36 @@ const styles = StyleSheet.create({
   reportCard: {
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(30, 41, 59, 0.95)',
     marginBottom: 16,
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  reportHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  reportTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginLeft: 12,
-  },
-  reportBody: {
-    padding: 16,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.2)',
   },
   reportLimitCard: {
     marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   reportLimitContent: {
-    padding: 20,
+    padding: 24,
     alignItems: 'center',
   },
   reportLimitTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#FFFFFF',
-    marginBottom: 12,
+    marginBottom: 16,
+    textAlign: 'center',
   },
   reportLimitIndicator: {
     flexDirection: 'row',
@@ -2421,44 +2409,29 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   reportLimitNumber: {
-    fontSize: 32,
+    fontSize: 48,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
   reportLimitLabel: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#FFFFFF',
     opacity: 0.9,
-    marginLeft: 8,
-  },
-  generateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#4F46E5',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 16,
-  },
-  generateButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  generateButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+    marginLeft: 12,
+    maxWidth: '60%',
   },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
+    backgroundColor: 'rgba(30, 41, 59, 0.7)',
+    borderRadius: 16,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#6B7280',
+    color: '#E2E8F0',
     textAlign: 'center',
   },
   errorText: {
@@ -3025,6 +2998,29 @@ const styles = StyleSheet.create({
   chart: {
     marginVertical: 8,
     borderRadius: 16,
+  },
+  reportBody: {
+    padding: 16,
+  },
+  generateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4F46E5',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  generateButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  generateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
 
