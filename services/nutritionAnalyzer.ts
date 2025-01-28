@@ -399,6 +399,15 @@ async function analyzeNutrition(
 
 async function generateNutritionReport(userId: string) {
   try {
+    // Check daily report limit
+    const today = new Date().toISOString().split('T')[0];
+    const reportCountKey = `user:${userId}:report_count:${today}`;
+    
+    const dailyReportCount = await redis.get(reportCountKey) || 0;
+    if (Number(dailyReportCount) >= 4) {
+      throw new Error('Daily report limit reached. You can generate up to 4 reports per day.');
+    }
+
     // Fetch user's data
     const [progressData, goalsData] = await Promise.all([
       getDailyProgress(userId),
@@ -443,9 +452,16 @@ async function generateNutritionReport(userId: string) {
         data: { progressData, goalsData, completion }
       })
     };
-    await redis.hset(`user:${userId}:reports`, hashData);
+    await Promise.all([
+      redis.hset(`user:${userId}:reports`, hashData),
+      redis.incr(reportCountKey),
+      redis.expire(reportCountKey, 86400) // Expire after 24 hours
+    ]);
 
-    return reportText;
+    return {
+      report: reportText,
+      remainingReports: 4 - (Number(dailyReportCount) + 1)
+    };
   } catch (error) {
     console.error('Error generating report:', error);
     throw error;

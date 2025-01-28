@@ -11,6 +11,7 @@ import Animated, {
   withTiming,
   useSharedValue,
   withSequence,
+  
   withDelay
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
@@ -150,6 +151,12 @@ export const NutritionAnalyzerOnboarding: React.FC<NutritionAnalyzerOnboardingPr
     }
   }, [visible, steps.length]);
 
+  const handleNext = () => {
+    setCurrentStep((prev) => (prev + 1) % steps.length);
+  };
+
+  const isLastStep = currentStep === steps.length - 1;
+
   useEffect(() => {
     progress.value = withSpring(currentStep / (steps.length - 1));
   }, [currentStep]);
@@ -238,12 +245,29 @@ export const NutritionAnalyzerOnboarding: React.FC<NutritionAnalyzerOnboardingPr
             <Animated.View style={[styles.progressBar, progressBarWidth]} />
           </View>
 
-          <TouchableOpacity 
-            style={styles.button}
-            onPress={onClose}
-          >
-            <Text style={styles.buttonText}>Get Started</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonContainer}>
+            {!isLastStep ? (
+              <TouchableOpacity 
+                style={[styles.button, styles.nextButton]}
+                onPress={handleNext}
+              >
+                <View style={styles.buttonContent}>
+                  <Text style={styles.buttonText}>Next</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.buttonIcon} />
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity 
+                style={[styles.button, styles.getStartedButton]}
+                onPress={onClose}
+              >
+                <View style={styles.buttonContent}>
+                  <Text style={styles.buttonText}>Get Started</Text>
+                  <Ionicons name="checkmark" size={20} color="#fff" style={styles.buttonIcon} />
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
         </Animated.View>
       </BlurView>
     </Modal>
@@ -345,18 +369,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#4F46E5',
     borderRadius: 2,
   },
+  buttonContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   button: {
-    backgroundColor: '#4F46E5',
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 30,
     width: '80%',
-    marginBottom: 20,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
+    marginRight: 8,
+  },
+  buttonIcon: {
+    marginLeft: 4,
+  },
+  nextButton: {
+    backgroundColor: '#4F46E5',
+  },
+  getStartedButton: {
+    backgroundColor: '#059669',
   },
 });

@@ -168,6 +168,13 @@ interface NutritionGoalsModalProps {
   initialGoals?: UserNutritionGoals;
 }
 
+interface ReportState {
+  loading: boolean;
+  error: string | null;
+  remainingReports: number;
+  report: string | null;
+}
+
 // Color palette with gradients
 const COLORS = {
   protein: ['#4F46E5', '#818CF8'] as [string, string],
@@ -389,9 +396,13 @@ const MealsLoggedIndicator = ({ mealsLogged }: { mealsLogged: number }) => (
 );
 
 const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizationProps) => {
-  const [activeTab, setActiveTab] = useState<'progress' | 'details' | 'trends' | 'report'>('progress');
-  const [report, setReport] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('progress');
+  const [reportState, setReportState] = useState<ReportState>({
+    loading: false,
+    error: null,
+    remainingReports: 4,
+    report: null
+  });
   const [goals, setGoals] = useState<UserNutritionGoals | null>(null);
   const [weeklyData, setWeeklyData] = useState<WeeklyData>({
     protein: [],
@@ -442,14 +453,21 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
   const generateReport = async () => {
     if (!userId) return;
     try {
-      setLoading(true);
-      const reportText = await generateNutritionReport(userId);
-      setReport(reportText);
+      setReportState(prev => ({ ...prev, loading: true, error: null }));
+      const response = await generateNutritionReport(userId);
+      setReportState(prev => ({
+        ...prev,
+        loading: false,
+        report: response.report,
+        remainingReports: response.remainingReports,
+        error: null
+      }));
     } catch (error) {
-      console.error('Error generating report:', error);
-      Alert.alert('Error', 'Failed to generate nutrition report');
-    } finally {
-      setLoading(false);
+      setReportState(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Failed to generate report'
+      }));
     }
   };
 
@@ -557,34 +575,95 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
   };
 
   const renderReportTab = () => (
-    <Animated.View
-      entering={FadeInDown}
-      style={styles.reportContainer}
-    >
-      {loading ? (
-        <ActivityIndicator size="large" color="#4F46E5" />
-      ) : report ? (
-        <ScrollView style={styles.reportContent}>
-          <BlurView intensity={80} style={styles.reportCard}>
-            {formatAIResponse(report)}
-            <TouchableOpacity
-              style={styles.generateButton}
-              onPress={generateReport}
-            >
-              <Text style={styles.generateButtonText}>Generate New Report</Text>
-            </TouchableOpacity>
-          </BlurView>
-        </ScrollView>
-      ) : (
-        <TouchableOpacity
-          style={styles.generateButton}
-          onPress={generateReport}
+    <ScrollView style={styles.reportContainer}>
+      <Animated.View
+        entering={FadeInDown.duration(600)}
+        style={styles.reportLimitCard}
+      >
+        <LinearGradient
+          colors={['#4F46E5', '#818CF8']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.reportLimitContent}
         >
-          <Ionicons name="document-text" size={24} color="#FFFFFF" />
-          <Text style={styles.generateButtonText}>Generate Nutrition Report</Text>
-        </TouchableOpacity>
+          <Text style={styles.reportLimitTitle}>Daily Report Limit</Text>
+          <View style={styles.reportLimitIndicator}>
+            <Text style={styles.reportLimitNumber}>{reportState.remainingReports}</Text>
+            <Text style={styles.reportLimitLabel}>reports remaining today</Text>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+
+      {reportState.loading ? (
+        <Animated.View 
+          entering={FadeInUp.duration(400)} 
+          style={styles.loadingContainer}
+        >
+          <ActivityIndicator size="large" color="#4F46E5" />
+          <Text style={styles.loadingText}>Generating your nutrition report...</Text>
+        </Animated.View>
+      ) : reportState.report ? (
+        <Animated.View
+          entering={FadeInUp.duration(600).springify()}
+          style={styles.reportContent}
+        >
+          <BlurView intensity={80} style={styles.reportCard}>
+            <View style={styles.reportHeader}>
+              <Ionicons name="nutrition" size={24} color="#4F46E5" />
+              <Text style={styles.reportTitle}>Nutrition Report</Text>
+            </View>
+            <View style={styles.reportBody}>
+              {formatAIResponse(reportState.report)}
+            </View>
+            {reportState.remainingReports > 0 && (
+              <TouchableOpacity
+                style={[
+                  styles.generateButton,
+                  reportState.remainingReports === 0 && styles.generateButtonDisabled
+                ]}
+                onPress={generateReport}
+                disabled={reportState.remainingReports === 0}
+              >
+                <Ionicons name="refresh" size={20} color="#FFFFFF" />
+                <Text style={styles.generateButtonText}>Generate New Report</Text>
+              </TouchableOpacity>
+            )}
+          </BlurView>
+        </Animated.View>
+      ) : reportState.error ? (
+        <Animated.View
+          entering={FadeInUp.duration(400)}
+          style={styles.loadingContainer}
+        >
+          <Ionicons name="alert-circle" size={32} color="#EF4444" />
+          <Text style={styles.errorText}>{reportState.error}</Text>
+          <TouchableOpacity
+            style={styles.generateButton}
+            onPress={generateReport}
+          >
+            <Ionicons name="refresh" size={20} color="#FFFFFF" />
+            <Text style={styles.generateButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      ) : (
+        <Animated.View
+          entering={FadeInUp.duration(600)}
+          style={styles.loadingContainer}
+        >
+          <Ionicons name="document-text" size={64} color="#4F46E5" />
+          <Text style={styles.loadingText}>
+            Generate your first nutrition report of the day
+          </Text>
+          <TouchableOpacity
+            style={styles.generateButton}
+            onPress={generateReport}
+          >
+            <Ionicons name="add-circle" size={24} color="#FFFFFF" />
+            <Text style={styles.generateButtonText}>Generate Nutrition Report</Text>
+          </TouchableOpacity>
+        </Animated.View>
       )}
-    </Animated.View>
+    </ScrollView>
   );
 
   const renderTabContent = () => {
@@ -718,28 +797,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                 >
                   <Text style={styles.sectionTitle}>Comprehensive Analysis</Text>
                   
-                  {/* Enhanced Health Score Section */}
-                  <View style={styles.healthInsightsSection}>
-                    <Text style={styles.sectionSubtitle}>Health Score</Text>
-                    <View style={styles.healthScore}>
-                      <Text style={styles.healthScoreTitle}>Nutrition Score</Text>
-                      <View style={[styles.healthScoreCircle, { backgroundColor: '#14B8A6' }]}>
-                        <Text style={styles.healthScoreValue}>
-                          {result?.health_analysis.health_score.score}
-                        </Text>
-                      </View>
-                      <ScrollView style={styles.healthFactors}>
-                        {result?.health_analysis.health_score.factors.map((factor: string, index: number) => (
-                          <View key={index} style={styles.healthFactorRow}>
-                            <Ionicons name="checkmark-circle" size={16} color="#14B8A6" />
-                            <Text style={styles.healthFactor}>{factor}</Text>
-                          </View>
-                        ))}
-                      </ScrollView>
-                    </View>
-                  </View>
-
-                  {/* Enhanced Micronutrients Section */}
+                  {/* Micronutrients Section */}
                   <View style={styles.micronutrientSection}>
                     <Text style={styles.sectionSubtitle}>Vitamins & Minerals</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.micronutrientScroll}>
@@ -758,10 +816,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                             {vitamin.amount}{vitamin.unit}
                           </Text>
                           <View style={styles.micronutrientProgress}>
-                            <LinearGradient
-                              colors={['#14B8A6', '#0D9488']}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 0 }}
+                            <View 
                               style={[
                                 styles.micronutrientProgressBar,
                                 { width: `${Math.min(vitamin.daily_value_percentage, 100)}%` }
@@ -791,10 +846,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                             {mineral.amount}{mineral.unit}
                           </Text>
                           <View style={styles.micronutrientProgress}>
-                            <LinearGradient
-                              colors={['#6366F1', '#4F46E5']}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 0 }}
+                            <View 
                               style={[
                                 styles.micronutrientProgressBar,
                                 { width: `${Math.min(mineral.daily_value_percentage, 100)}%` }
@@ -809,7 +861,41 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                     </ScrollView>
                   </View>
 
-                  {/* Enhanced Macronutrients Section */}
+                  {/* Health Insights */}
+                  <View style={styles.healthInsightsSection}>
+                    <Text style={styles.sectionSubtitle}>Health Insights</Text>
+                    <View style={styles.healthScore}>
+                      <Text style={styles.healthScoreTitle}>Nutrition Score</Text>
+                      <View style={styles.healthScoreCircle}>
+                        <Text style={styles.healthScoreValue}>
+                          {result?.health_analysis.health_score.score}
+                        </Text>
+                      </View>
+                      <ScrollView style={styles.healthFactors}>
+                        {result?.health_analysis.health_score.factors.map((factor: string, index: number) => (
+                          <Text key={index} style={styles.healthFactor}>• {factor}</Text>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </View>
+
+                  {/* Meal Timing Analysis */}
+                  <View style={styles.mealTimingSection}>
+                    <Text style={styles.sectionSubtitle}>Optimal Meal Timing</Text>
+                    <View style={styles.mealTimingCard}>
+                      <Ionicons name="time-outline" size={24} color="#14B8A6" />
+                      <View style={styles.mealTimingContent}>
+                        <Text style={styles.mealTimingTime}>
+                          {result?.recommendations.meal_timing.best_time}
+                        </Text>
+                        <Text style={styles.mealTimingReason}>
+                          {result?.recommendations.meal_timing.reason}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Macronutrients Section */}
                   <View style={styles.nutrientSection}>
                     <Text style={styles.nutrientSectionTitle}>Macronutrients</Text>
                     <View style={styles.nutrientList}>
@@ -858,22 +944,6 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                     </View>
                   </View>
 
-                  {/* Meal Timing Analysis */}
-                  <View style={styles.mealTimingSection}>
-                    <Text style={styles.sectionSubtitle}>Optimal Meal Timing</Text>
-                    <View style={styles.mealTimingCard}>
-                      <Ionicons name="time-outline" size={24} color="#14B8A6" />
-                      <View style={styles.mealTimingContent}>
-                        <Text style={styles.mealTimingTime}>
-                          {result?.recommendations.meal_timing.best_time}
-                        </Text>
-                        <Text style={styles.mealTimingReason}>
-                          {result?.recommendations.meal_timing.reason}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
                   {/* Daily Summary */}
                   <View style={styles.summarySection}>
                     <Text style={styles.nutrientSectionTitle}>Daily Summary</Text>
@@ -890,6 +960,19 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                         </Text>
                         <Text style={styles.summaryLabel}>Calorie Goal</Text>
                       </View>
+                    </View>
+                  </View>
+
+                  {/* Nutrition Tips */}
+                  <View style={styles.tipsSection}>
+                    <Text style={styles.nutrientSectionTitle}>Nutrition Tips</Text>
+                    <View style={styles.tipsList}>
+                      {generateNutritionTips(nutritionData, goals, dailyProgress).map((tip, index) => (
+                        <View key={index} style={styles.tipItem}>
+                          <Ionicons name={tip.icon as keyof typeof Ionicons.glyphMap} size={20} color={tip.color} />
+                          <Text style={styles.tipText}>{tip.text}</Text>
+                        </View>
+                      ))}
                     </View>
                   </View>
                 </LinearGradient>
@@ -2283,28 +2366,70 @@ const styles = StyleSheet.create({
   },
   reportContainer: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#F9FAFB',
+    padding: 16,
   },
   reportContent: {
     flex: 1,
   },
   reportCard: {
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
     borderRadius: 16,
-    padding: 20,
-    margin: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.3)',
-    elevation: 8,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 16,
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  reportText: {
-    fontSize: 16,
+  reportHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  reportTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
     color: '#1F2937',
-    lineHeight: 24,
+    marginLeft: 12,
+  },
+  reportBody: {
+    padding: 16,
+  },
+  reportLimitCard: {
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  reportLimitContent: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  reportLimitTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 12,
+  },
+  reportLimitIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  reportLimitNumber: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  reportLimitLabel: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.9,
+    marginLeft: 8,
   },
   generateButton: {
     flexDirection: 'row',
@@ -2313,7 +2438,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#4F46E5',
     padding: 16,
     borderRadius: 12,
-    marginTop: 20,
+    marginTop: 16,
+  },
+  generateButtonDisabled: {
+    backgroundColor: '#9CA3AF',
   },
   generateButtonText: {
     color: '#FFFFFF',
@@ -2321,16 +2449,33 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+  },
   mealsLoggedContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
     padding: 16,
-    marginTop: 24,
   },
   mealsLoggedTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
+    color: '#FFFFFF',
     marginBottom: 16,
   },
   mealsLoggedCircle: {
@@ -2344,7 +2489,7 @@ const styles = StyleSheet.create({
   mealsLoggedNumber: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#FFFFFF',
   },
   aiMainHeader: {
     fontSize: 26,
@@ -2878,7 +3023,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   chart: {
-    // Define your chart style here
     marginVertical: 8,
     borderRadius: 16,
   },
