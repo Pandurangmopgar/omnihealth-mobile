@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 import { Redis } from '@upstash/redis';
+import { analyzeNutritionWithDeepSeek } from './nutritionAnalyzerDeepSeek';
 
 // Initialize clients
 const genAI = new GoogleGenerativeAI(process.env.EXPO_PUBLIC_GOOGLE_API_KEY || "");
@@ -308,43 +309,56 @@ async function analyzeNutrition(
   userId: string
 ): Promise<{ analysis: NutritionAnalysis; progress: NutritionProgress }> {
   try {
+    console.log('🎯 analyzeNutrition called with:', { type, content: content.substring(0, 100), userId });
+    
     if (!userId) {
+      console.error('❌ No userId provided');
       throw new Error('User ID is required');
     }
 
-    let prompt = '';
-    let parts = [];
-
+    // For text analysis, use DeepSeek
     if (type === 'text') {
-      prompt = `Analyze this food description: ${content}`;
-      parts = [{ text: systemPrompt }, { text: prompt }];
-    } else {
-      prompt = 'Analyze this food image and provide nutritional information.';
-      parts = [
-        { text: systemPrompt },
-        { text: prompt },
-        {
-          inlineData: {
-            mimeType: 'image/jpeg',
-            data: content
-          }
-        }
-      ];
+      console.log('📝 Routing text analysis to DeepSeek service...');
+      try {
+        const result = await analyzeNutritionWithDeepSeek(content, userId);
+        console.log('✅ DeepSeek analysis completed successfully');
+        return result;
+      } catch (error) {
+        console.error('❌ DeepSeek analysis failed:', error);
+        throw error;
+      }
     }
+
+    // For image analysis, continue using Gemini
+    console.log('🖼️ Processing image analysis with Gemini...');
+    let prompt = 'Analyze this food image and provide nutritional information.';
+    let parts = [
+      { text: systemPrompt },
+      { text: prompt },
+      {
+        inlineData: {
+          mimeType: 'image/jpeg',
+          data: content
+        }
+      }
+    ];
 
     // Check cache first
     const cacheKey = `nutrition_analysis:${type}:${content.substring(0, 100)}`;
+    console.log('🔍 Checking cache with key:', cacheKey);
 
     // Check cache first to reduce API calls
     try {
       const cachedResult = await redis.get(cacheKey);
       if (cachedResult) {
+        console.log('✨ Found cached result');
         const analysis = typeof cachedResult === 'string' ? JSON.parse(cachedResult) : cachedResult;
         const progress = await updateDailyProgress(userId, analysis.nutritional_content);
         return { analysis, progress };
       }
+      console.log('💫 No cached result found');
     } catch (error) {
-      console.warn('Cache retrieval failed:', error);
+      console.warn('⚠️ Cache retrieval failed:', error);
     }
 
     // Add retry logic with exponential backoff
@@ -354,6 +368,7 @@ async function analyzeNutrition(
 
     while (retries > 0) {
       try {
+        console.log(`🔄 Attempting Gemini API call (${4-retries}/3)...`);
         const result = await model.generateContent(parts);
         if (!result.response) {
           throw new Error('Empty response from AI model');
@@ -363,10 +378,13 @@ async function analyzeNutrition(
           throw new Error('Empty text in AI response');
         }
         analysis = formatAIResponse(responseText);
+        console.log('✅ Gemini API call successful');
         break;
       } catch (error) {
         retries--;
+        console.error(`❌ Attempt failed (${retries} retries left):`, error);
         if (retries === 0) throw error;
+        console.log(`⏳ Waiting ${delay}ms before next attempt...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         delay *= 2; // Exponential backoff
       }
@@ -374,25 +392,32 @@ async function analyzeNutrition(
 
     // Ensure all required fields are present
     if (!analysis) {
+      console.error('❌ No analysis generated');
       throw new Error('Failed to generate analysis');
     }
 
     // Cache successful result
     try {
+      console.log('💾 Caching analysis result...');
       await redis.set(cacheKey, JSON.stringify(analysis), { ex: CACHE_TTL });
+      console.log('✅ Analysis cached successfully');
     } catch (error) {
-      console.warn('Cache storage failed:', error);
+      console.warn('⚠️ Cache storage failed:', error);
     }
 
     // Update progress with comprehensive data
+    console.log('📊 Updating daily progress...');
     const progress = await updateDailyProgress(userId, analysis.nutritional_content);
+    console.log('✅ Progress updated successfully');
 
     // Store detailed analysis
+    console.log('💾 Storing analysis result...');
     await storeAnalysisResult(userId, analysis);
+    console.log('✅ Analysis stored successfully');
 
     return { analysis, progress };
   } catch (error) {
-    console.error('Nutrition analysis error:', error);
+    console.error('❌ Nutrition analysis error:', error);
     throw new NutritionAnalysisError(error instanceof Error ? error.message : 'Failed to analyze nutrition');
   }
 }
@@ -770,5 +795,5 @@ export {
   generateNutritionReport,
   calculateOptimalReminders,
   checkNutritionGoals,
-  NutritionProgress
+  
 };

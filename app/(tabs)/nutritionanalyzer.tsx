@@ -8,7 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { MotiView } from 'moti';
 import { useAuth } from '@clerk/clerk-expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { analyzeNutrition, getDailyProgress, getDailyGoals, generateNutritionReport, getWeeklyData } from '../../services/nutritionAnalyzer';
+import { getDailyProgress, getDailyGoals, generateNutritionReport, getWeeklyData } from '../../services/nutritionAnalyzer';
 import { registerForPushNotifications, scheduleNutritionReminders } from '../../services/pushNotifications';
 import { PieChart, LineChart } from 'react-native-chart-kit';
 import Svg, { Circle } from 'react-native-svg';
@@ -25,6 +25,7 @@ import {
   NutritionGoals as UserNutritionGoals, 
   NutritionGoalInput as UserGoalInput 
 } from '../../services/nutritionGoals';
+import { analyzeNutritionWithDeepSeek } from '../../services/nutritionAnalyzerDeepSeek';
 
 interface ProgressRingProps {
   progress: number;
@@ -3022,7 +3023,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
-});
+});    
 
 const generateNutritionTips = (
   nutritionData: NutritionData,
@@ -3155,15 +3156,29 @@ export default function NutritionAnalyzer() {
 
   const debouncedAnalyzeText = useCallback(
     debounce(async (text: string) => {
-      if (!text.trim() || isLoading || !userId) return;
+      if (!text.trim() || isLoading || !userId) {
+        console.log('❌ Text analysis skipped:', { 
+          hasText: !!text.trim(), 
+          isLoading, 
+          hasUserId: !!userId 
+        });
+        return;
+      }
       
       try {
+        console.log('🚀 Starting text analysis for:', text);
         setIsLoading(true);
         router.push('/(tabs)/nutritionanalyzer');
-        const { analysis } = await analyzeNutrition('text', text, userId);
+        
+        console.log('📡 Calling DeepSeek service directly...');
+        const { analysis, progress } = await analyzeNutritionWithDeepSeek(text, userId);
+        console.log('✅ Analysis received:', analysis);
+        
         setResult(analysis);
+        setDailyProgress(progress);
+        console.log('💾 Analysis result stored in state');
       } catch (error) {
-        console.error('Error analyzing nutrition:', error);
+        console.error('❌ Error analyzing nutrition:', error);
         Alert.alert('Error', 'Failed to analyze nutrition. Please try again.');
       } finally {
         setIsLoading(false);
@@ -3173,10 +3188,8 @@ export default function NutritionAnalyzer() {
   );
 
   const handleTextChange = (text: string) => {
+    console.log('📝 Text input changed:', text);
     setTextInput(text);
-    if (text.trim()) {
-      debouncedAnalyzeText(text);
-    }
   };
 
   useEffect(() => {
@@ -3194,7 +3207,7 @@ export default function NutritionAnalyzer() {
     try {
       setIsLoading(true);
       router.push('/(tabs)/nutritionanalyzer');
-      const { analysis, progress } = await analyzeNutrition('image', imageUri, userId);
+      const { analysis, progress } = await analyzeNutritionWithDeepSeek(imageUri, userId);
       setResult(analysis);
       setDailyProgress(progress); // Update progress immediately after analysis
     } catch (error) {
