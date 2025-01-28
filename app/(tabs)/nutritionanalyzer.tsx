@@ -25,7 +25,7 @@ import {
   NutritionGoals as UserNutritionGoals, 
   NutritionGoalInput as UserGoalInput 
 } from '../../services/nutritionGoals';
-import { analyzeNutritionWithDeepSeek } from '../../services/nutritionAnalyzerDeepSeek';
+import { analyzeNutrition } from '../../services/nutritionAnalyzer';
 
 interface ProgressRingProps {
   progress: number;
@@ -3170,8 +3170,8 @@ export default function NutritionAnalyzer() {
         setIsLoading(true);
         router.push('/(tabs)/nutritionanalyzer');
         
-        console.log('📡 Calling DeepSeek service directly...');
-        const { analysis, progress } = await analyzeNutritionWithDeepSeek(text, userId);
+        console.log('📡 Calling nutrition analyzer service...');
+        const { analysis, progress } = await analyzeNutrition('text', text, userId);
         console.log('✅ Analysis received:', analysis);
         
         setResult(analysis);
@@ -3200,18 +3200,22 @@ export default function NutritionAnalyzer() {
 
   const handleImageAnalysis = async (imageUri: string) => {
     if (!userId) {
-      Alert.alert('Error', 'Please sign in to analyze food.');
+      Alert.alert('Error', 'Please sign in to analyze images');
       return;
     }
 
     try {
       setIsLoading(true);
-      router.push('/(tabs)/nutritionanalyzer');
-      const { analysis, progress } = await analyzeNutritionWithDeepSeek(imageUri, userId);
+      console.log('🖼️ Starting image analysis...');
+
+      const { analysis, progress } = await analyzeNutrition('image', imageUri, userId);
+      console.log('✅ Image analysis complete');
+
       setResult(analysis);
-      setDailyProgress(progress); // Update progress immediately after analysis
+      setDailyProgress(progress);
+      setImage(imageUri);
     } catch (error) {
-      console.error('Error analyzing image:', error);
+      console.error('❌ Error analyzing image:', error);
       Alert.alert('Error', 'Failed to analyze image. Please try again.');
     } finally {
       setIsLoading(false);
