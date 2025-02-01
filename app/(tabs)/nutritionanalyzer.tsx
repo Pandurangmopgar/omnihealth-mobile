@@ -17,7 +17,7 @@ import { VictoryPie, VictoryChart, VictoryBar, VictoryAxis, VictoryLabel } from 
 import { BlurView } from 'expo-blur';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import debounce from 'lodash/debounce';
-import { NutritionGoalsModal as GoalsModalComponent } from '../../components/NutritionGoalsModal';
+import { NutritionGoalsModal } from '../../components/NutritionGoalsModal';
 import { NutritionAnalyzerOnboarding } from '../../components/NutritionAnalyzerOnboarding';
 import { 
   fetchUserNutritionGoals, 
@@ -160,13 +160,6 @@ interface NutritionGoalInput {
   protein: string;
   carbs: string;
   fat: string;
-}
-
-interface NutritionGoalsModalProps {
-  visible: boolean;
-  onClose: () => void;
-  onSave: (goals: UserGoalInput) => Promise<void>;
-  initialGoals?: UserNutritionGoals;
 }
 
 interface ReportState {
@@ -578,7 +571,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
   const renderReportTab = () => (
     <ScrollView style={styles.reportContainer}>
       <Animated.View
-        entering={FadeInDown.duration(600)}
+        entering={FadeInDown.delay(100)}
         style={styles.reportLimitCard}
       >
         <LinearGradient
@@ -1670,103 +1663,170 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
   );
 };
 
-const NutritionGoalsModal = ({ visible, onClose, onSave, initialGoals }: NutritionGoalsModalProps) => {
-  const [goalInput, setGoalInput] = useState<NutritionGoalInput>({
-    calories: initialGoals?.daily_calories?.toString() || '2000',
-    protein: initialGoals?.daily_protein?.toString() || '100',
-    carbs: initialGoals?.daily_carbs?.toString() || '225',
-    fat: initialGoals?.daily_fat?.toString() || '65',
-  });
-
-  const handleSave = () => {
-    // Validate inputs
-    const values = Object.values(goalInput);
-    for (const value of values) {
-      const num = Number(value);
-      if (isNaN(num) || num <= 0) {
-        Alert.alert('Invalid Input', 'Please enter valid positive numbers for all fields.');
-        return;
-      }
-    }
-    onSave(goalInput);
-  };
+const AnalysisResultsModal = ({ result, visible, onClose }: { 
+  result: NutritionResult | null; 
+  visible: boolean; 
+  onClose: () => void;
+}) => {
+  if (!result) return null;
 
   return (
     <Modal
       visible={visible}
-      animationType="slide"
-      transparent={true}
+      transparent
+      animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+      <BlurView intensity={20} style={styles.modalContainer}>
+        <Animated.View 
+          entering={FadeInDown.duration(300)}
+          style={styles.modalContent}
+        >
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Set Your Nutrition Goals</Text>
-            <TouchableOpacity onPress={onClose}>
+            <Text style={styles.modalTitle}>Analysis Results</Text>
+            <Text style={styles.processingLabel}>
+              {result.basic_info.food_name} - {result.basic_info.portion_size}
+              <Text style={styles.processingBadge}> {result.basic_info.preparation_method}</Text>
+            </Text>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
               <Ionicons name="close" size={24} color="#fff" />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Daily Calories</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="numeric"
-              value={goalInput.calories}
-              onChangeText={(text) => setGoalInput(prev => ({ ...prev, calories: text }))}
-              placeholder="e.g., 2000"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
-            />
-          </View>
+          <ScrollView style={styles.modalBody}>
+            {/* Macronutrients Section */}
+            <View style={styles.nutrientSection}>
+              <View style={styles.sectionRow}>
+                <View style={styles.nutrientBox}>
+                  <Ionicons name="flame" size={24} color={COLORS.calories[0]} />
+                  <Text style={styles.nutrientValue}>{result.nutritional_content.calories}</Text>
+                  <Text style={styles.nutrientLabel}>kcal</Text>
+                  <Text style={styles.nutrientPercentage}>{Math.round(result.nutritional_content.calories / 2000 * 100)}% DV</Text>
+                </View>
+                <View style={styles.nutrientBox}>
+                  <Ionicons name="barbell" size={24} color={COLORS.protein[0]} />
+                  <Text style={styles.nutrientValue}>{result.nutritional_content.macronutrients.protein.amount}</Text>
+                  <Text style={styles.nutrientLabel}>g protein</Text>
+                  <Text style={styles.nutrientPercentage}>{result.nutritional_content.macronutrients.protein.daily_value_percentage}% DV</Text>
+                </View>
+              </View>
+              <View style={styles.sectionRow}>
+                <View style={styles.nutrientBox}>
+                  <Ionicons name="leaf" size={24} color={COLORS.carbs[0]} />
+                  <Text style={styles.nutrientValue}>{result.nutritional_content.macronutrients.carbs.amount}</Text>
+                  <Text style={styles.nutrientLabel}>g carbs</Text>
+                  <Text style={styles.nutrientPercentage}>{result.nutritional_content.macronutrients.carbs.daily_value_percentage}% DV</Text>
+                </View>
+                <View style={styles.nutrientBox}>
+                  <Ionicons name="water" size={24} color={COLORS.fat[0]} />
+                  <Text style={styles.nutrientValue}>{result.nutritional_content.macronutrients.fats.amount}</Text>
+                  <Text style={styles.nutrientLabel}>g fats</Text>
+                  <Text style={styles.nutrientPercentage}>{result.nutritional_content.macronutrients.fats.daily_value_percentage}% DV</Text>
+                </View>
+              </View>
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Protein (g)</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="numeric"
-              value={goalInput.protein}
-              onChangeText={(text) => setGoalInput(prev => ({ ...prev, protein: text }))}
-              placeholder="e.g., 100"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
-            />
-          </View>
+            {/* Vitamins & Minerals */}
+            <View style={styles.micronutrientsSection}>
+              <Text style={styles.sectionTitle}>Vitamins & Minerals</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {result.nutritional_content.micronutrients.vitamins.map((vitamin, index) => (
+                  <View key={`vitamin-${index}`} style={styles.microCard}>
+                    <Text style={styles.microName}>{vitamin.name}</Text>
+                    <Text style={styles.microValue}>{vitamin.amount}{vitamin.unit}</Text>
+                    <View style={styles.microProgressContainer}>
+                      <LinearGradient
+                        colors={['#4F46E5', '#818CF8']}
+                        style={[styles.microProgress, { width: `${Math.min(vitamin.daily_value_percentage, 100)}%` }]}
+                      />
+                    </View>
+                    <Text style={styles.microPercentage}>{vitamin.daily_value_percentage}% DV</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Carbs (g)</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="numeric"
-              value={goalInput.carbs}
-              onChangeText={(text) => setGoalInput(prev => ({ ...prev, carbs: text }))}
-              placeholder="e.g., 225"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
-            />
-          </View>
+            {/* Health Analysis */}
+            <View style={styles.healthSection}>
+              <Text style={styles.sectionTitle}>Health Analysis</Text>
+              <View style={styles.healthScore}>
+                <AnimatedProgressRing
+                  progress={result.health_analysis.health_score.score / 100}
+                  size={80}
+                  strokeWidth={8}
+                  color={COLORS.protein[0]}
+                />
+                <Text style={styles.healthScoreText}>{result.health_analysis.health_score.score}</Text>
+                <Text style={styles.healthScoreLabel}>Health Score</Text>
+              </View>
+              
+              {/* Benefits */}
+              <View style={styles.benefitsSection}>
+                <Text style={styles.subsectionTitle}>Benefits</Text>
+                {result.health_analysis.benefits.map((benefit, index) => (
+                  <View key={`benefit-${index}`} style={styles.benefitItem}>
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                    <Text style={styles.benefitText}>{benefit}</Text>
+                  </View>
+                ))}
+              </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Fat (g)</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="numeric"
-              value={goalInput.fat}
-              onChangeText={(text) => setGoalInput(prev => ({ ...prev, fat: text }))}
-              placeholder="e.g., 65"
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
-            />
-          </View>
+              {/* Considerations */}
+              {result.health_analysis.considerations.length > 0 && (
+                <View style={styles.considerationsSection}>
+                  <Text style={styles.subsectionTitle}>Considerations</Text>
+                  {result.health_analysis.considerations.map((consideration, index) => (
+                    <View key={`consideration-${index}`} style={styles.considerationItem}>
+                      <Ionicons name="information-circle" size={20} color="#F59E0B" />
+                      <Text style={styles.considerationText}>{consideration}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
 
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <LinearGradient
-              colors={['#4F46E5', '#818CF8']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.saveButtonGradient}
-            >
-              <Text style={styles.saveButtonText}>Save Goals</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </View>
+              {/* Recommendations */}
+              {result.recommendations && (
+                <View style={styles.recommendationsSection}>
+                  <Text style={styles.subsectionTitle}>Recommendations</Text>
+                  {result.recommendations.serving_suggestions.length > 0 && (
+                    <View style={styles.recommendationGroup}>
+                      <Text style={styles.recommendationTitle}>
+                        <Ionicons name="restaurant" size={18} color="#4C6EF5" /> Serving Suggestions
+                      </Text>
+                      {result.recommendations.serving_suggestions.map((suggestion, index) => (
+                        <Text key={index} style={styles.recommendationItem}>• {suggestion}</Text>
+                      ))}
+                    </View>
+                  )}
+                  {result.recommendations.healthier_alternatives.length > 0 && (
+                    <View style={styles.recommendationGroup}>
+                      <Text style={styles.recommendationTitle}>
+                        <Ionicons name="leaf" size={18} color="#4C6EF5" /> Healthier Alternatives
+                      </Text>
+                      {result.recommendations.healthier_alternatives.map((alternative, index) => (
+                        <Text key={index} style={styles.recommendationItem}>• {alternative}</Text>
+                      ))}
+                    </View>
+                  )}
+                  {result.recommendations.meal_timing && (
+                    <View style={styles.recommendationGroup}>
+                      <Text style={styles.recommendationTitle}>
+                        <Ionicons name="time" size={18} color="#4C6EF5" /> Best Time to Consume
+                      </Text>
+                      <Text style={styles.recommendationItem}>
+                        {result.recommendations.meal_timing.best_time}
+                      </Text>
+                      <Text style={styles.recommendationReason}>
+                        {result.recommendations.meal_timing.reason}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        </Animated.View>
+      </BlurView>
     </Modal>
   );
 };
@@ -2135,8 +2195,6 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   statsOverview: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -2855,9 +2913,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   healthScoreTitle: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+    color: '#FFFFFF',
     marginBottom: 12,
   },
   healthScoreCircle: {
@@ -2870,9 +2928,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   healthScoreValue: {
-    color: '#FFFFFF',
     fontSize: 24,
     fontWeight: '700',
+    color: '#FFFFFF',
   },
   healthFactors: {
     maxHeight: 100,
@@ -2897,14 +2955,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mealTimingTime: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
   mealTimingReason: {
-    color: '#9CA3AF',
     fontSize: 14,
+    color: '#9CA3AF',
   },
   trendsCardContainer: {
     marginBottom: 16,
@@ -3023,7 +3081,262 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
-});    
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: '90%',
+    maxWidth: 500,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  processingLabel: {
+    fontSize: 16,
+    color: '#9CA3AF',
+  },
+  processingBadge: {
+    color: '#10B981',
+    fontStyle: 'italic',
+  },
+  closeButton: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
+    padding: 8,
+  },
+  modalBody: {
+    padding: 20,
+  },
+  nutrientSection: {
+    marginBottom: 24,
+  },
+  sectionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  nutrientBox: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 8,
+    alignItems: 'center',
+  },
+  nutrientValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginTop: 8,
+  },
+  nutrientLabel: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  nutrientPercentage: {
+    fontSize: 12,
+    color: '#10B981',
+    marginTop: 4,
+  },
+  micronutrientsSection: {
+    marginBottom: 24,
+  },
+  microCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginRight: 16,
+    width: 150,
+  },
+  microName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  microValue: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginBottom: 8,
+  },
+  microProgressContainer: {
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  microProgress: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  microPercentage: {
+    fontSize: 12,
+    color: '#10B981',
+  },
+  healthSection: {
+    marginBottom: 24,
+  },
+  healthScore: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  healthScoreText: {
+    position: 'absolute',
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1F2937',
+  },
+  healthScoreLabel: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 8,
+  },
+  benefitsSection: {
+    marginBottom: 16,
+  },
+  subsectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  benefitItem: {
+    fontSize: 14,
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  considerationsSection: {
+    marginBottom: 16,
+  },
+  considerationItem: {
+    fontSize: 14,
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  recommendationsSection: {
+    marginTop: 16,
+  },
+  recommendationGroup: {
+    marginBottom: 16,
+  },
+  recommendationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  recommendationItem: {
+    fontSize: 14,
+    color: '#1F2937',
+    marginBottom: 4,
+    paddingLeft: 8,
+  },
+  recommendationReason: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    paddingLeft: 8,
+    fontStyle: 'italic',
+  },
+  modeSelector: {
+    flexDirection: 'row',
+    marginBottom: 20,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    padding: 4,
+  },
+  modeButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  modeButtonActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  modeButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  modeButtonTextActive: {
+    color: '#4F46E5',
+    fontWeight: '600',
+  },
+  scrollView: {
+    maxHeight: '100%',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#1F2937',
+    textAlign: 'center',
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 16,
+    marginBottom: 8,
+    color: '#4B5563',
+    fontWeight: '500',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#F9FAFB',
+  },
+  buttonContainer: {
+    marginTop: 24,
+  },
+  button: {
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  saveButton: {
+    backgroundColor: '#4F46E5',
+  },
+  cancelButton: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cancelButtonText: {
+    color: '#4B5563',
+  },
+});
 
 const generateNutritionTips = (
   nutritionData: NutritionData,
@@ -3097,6 +3410,7 @@ export default function NutritionAnalyzer() {
   });
   const [showGoalsModal, setShowGoalsModal] = useState(false);
   const [currentGoals, setCurrentGoals] = useState<UserNutritionGoals | null>(null);
+  const [showAnalysis, setShowAnalysis] = useState(false);
 
   // Fetch daily progress and goals
   const fetchDailyProgress = useCallback(async () => {
@@ -3152,6 +3466,7 @@ export default function NutritionAnalyzer() {
     setImage(null);
     setTextInput('');
     setResult(null);
+    setShowAnalysis(false);
   };
 
   const debouncedAnalyzeText = useCallback(
@@ -3317,6 +3632,13 @@ export default function NutritionAnalyzer() {
       }
     }
   };
+
+  useEffect(() => {
+    if (result) {
+      setShowAnalysis(true);
+      fetchDailyProgress();
+    }
+  }, [result, fetchDailyProgress]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -3522,6 +3844,12 @@ export default function NutritionAnalyzer() {
         onSave={handleSaveGoals}
         initialGoals={currentGoals || undefined}
       />
+      <AnalysisResultsModal
+        result={result}
+        visible={showAnalysis}
+        onClose={() => setShowAnalysis(false)}
+      />
+      <StatusBar style="light" />
     </View>
   );
-}
+};
