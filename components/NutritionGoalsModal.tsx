@@ -605,12 +605,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   actionSheet: {
-    backgroundColor: '#fff',
+    backgroundColor: '#0A1128',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
   },
   actionSheetIndicator: {
-    backgroundColor: '#E0E0E0',
+    backgroundColor: '#4B5563',
     width: 40,
     height: 4,
     borderRadius: 2,
@@ -622,28 +622,32 @@ const styles = StyleSheet.create({
   actionSheetTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: '#fff',
     marginBottom: 16,
     textAlign: 'center',
   },
   actionSheetOption: {
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: 'rgba(75, 85, 99, 0.2)',
   },
   actionSheetOptionLast: {
     borderBottomWidth: 0,
   },
   actionSheetOptionText: {
     fontSize: 16,
+    color: '#fff',
     textAlign: 'center',
   },
   actionSheetCancel: {
     marginTop: 8,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
     borderRadius: 8,
   },
   actionSheetCancelText: {
-    color: '#FF3B30',
+    fontSize: 16,
+    color: '#EF4444',
+    textAlign: 'center',
     fontWeight: '600',
   }
 });
