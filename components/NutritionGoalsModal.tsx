@@ -39,10 +39,10 @@ interface NutritionGoalsModalProps {
 }
 
 const defaultGoals: NutritionGoals = {
-  daily_calories: 0,
-  daily_protein: 0,
-  daily_carbs: 0,
-  daily_fat: 0,
+  daily_calories: 2000,
+  daily_protein: 150,
+  daily_carbs: 250,
+  daily_fat: 70,
 };
 
 const defaultCustomGoals: CustomGoals = {
@@ -75,8 +75,12 @@ export const NutritionGoalsModal: React.FC<NutritionGoalsModalProps> = ({
   initialGoals,
 }) => {
   const [activeTab, setActiveTab] = useState<'custom' | 'ai'>('custom');
-  const [goals, setGoals] = useState<NutritionGoals>(initialGoals || defaultGoals);
-  const [customGoals, setCustomGoals] = useState<CustomGoals>(defaultCustomGoals);
+  const [customGoals, setCustomGoals] = useState<CustomGoals>(() => ({
+    calories: (initialGoals?.daily_calories || defaultGoals.daily_calories).toString(),
+    protein: (initialGoals?.daily_protein || defaultGoals.daily_protein).toString(),
+    carbs: (initialGoals?.daily_carbs || defaultGoals.daily_carbs).toString(),
+    fat: (initialGoals?.daily_fat || defaultGoals.daily_fat).toString(),
+  }));
   const [aiFormData, setAiFormData] = useState<AIGoalCalculationInput>(defaultAIInput);
   const [isLoading, setIsLoading] = useState(false);
   const [actionSheetConfig, setActionSheetConfig] = useState<ActionSheetConfig | null>(null);
@@ -216,7 +220,12 @@ export const NutritionGoalsModal: React.FC<NutritionGoalsModalProps> = ({
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
       <View style={styles.inputContainer}>
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Daily Calories</Text>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>Daily Calories</Text>
+            <Text style={styles.currentValue}>
+              Current: {initialGoals?.daily_calories || defaultGoals.daily_calories}
+            </Text>
+          </View>
           <TextInput
             style={styles.input}
             value={customGoals.calories}
@@ -228,7 +237,12 @@ export const NutritionGoalsModal: React.FC<NutritionGoalsModalProps> = ({
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Daily Protein (g)</Text>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>Daily Protein (g)</Text>
+            <Text style={styles.currentValue}>
+              Current: {initialGoals?.daily_protein || defaultGoals.daily_protein}g
+            </Text>
+          </View>
           <TextInput
             style={styles.input}
             value={customGoals.protein}
@@ -240,7 +254,12 @@ export const NutritionGoalsModal: React.FC<NutritionGoalsModalProps> = ({
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Daily Carbs (g)</Text>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>Daily Carbs (g)</Text>
+            <Text style={styles.currentValue}>
+              Current: {initialGoals?.daily_carbs || defaultGoals.daily_carbs}g
+            </Text>
+          </View>
           <TextInput
             style={styles.input}
             value={customGoals.carbs}
@@ -252,7 +271,12 @@ export const NutritionGoalsModal: React.FC<NutritionGoalsModalProps> = ({
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Daily Fat (g)</Text>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>Daily Fat (g)</Text>
+            <Text style={styles.currentValue}>
+              Current: {initialGoals?.daily_fat || defaultGoals.daily_fat}g
+            </Text>
+          </View>
           <TextInput
             style={styles.input}
             value={customGoals.fat}
@@ -283,119 +307,140 @@ export const NutritionGoalsModal: React.FC<NutritionGoalsModalProps> = ({
 
   const renderAIForm = () => (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-      <View style={styles.inputContainer}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Age</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={aiFormData.age > 0 ? aiFormData.age.toString() : ''}
-            onChangeText={(value) => setAiFormData({ ...aiFormData, age: parseInt(value) || 0 })}
-            placeholder="Enter your age"
-            placeholderTextColor="rgba(255, 255, 255, 0.5)"
-          />
+      <View style={styles.aiFormContainer}>
+        <View style={styles.aiSection}>
+          <Text style={styles.aiSectionTitle}>Basic Information</Text>
+          <View style={styles.aiInputGroup}>
+            <View style={styles.aiInputRow}>
+              <View style={[styles.aiInput, { flex: 1, marginRight: 8 }]}>
+                <Text style={styles.label}>Age</Text>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="numeric"
+                  value={aiFormData.age > 0 ? aiFormData.age.toString() : ''}
+                  onChangeText={(value) => setAiFormData({ ...aiFormData, age: parseInt(value) || 0 })}
+                  placeholder="Enter age"
+                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                />
+              </View>
+              <View style={[styles.aiInput, { flex: 1, marginLeft: 8 }]}>
+                <Text style={styles.label}>Gender</Text>
+                <TouchableOpacity 
+                  style={styles.selectButton}
+                  onPress={() => {
+                    showOptionPicker(
+                      'Select Gender',
+                      [
+                        { label: 'Male', value: 'male' },
+                        { label: 'Female', value: 'female' },
+                      ],
+                      handleGenderSelect
+                    );
+                  }}
+                >
+                  <Text style={styles.selectButtonText}>
+                    {aiFormData.gender === 'male' ? 'Male' : 'Female'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Gender</Text>
-          <TouchableOpacity 
-            style={styles.selectButton}
-            onPress={() => {
-              showOptionPicker(
-                'Select Gender',
-                [
-                  { label: 'Male', value: 'male' },
-                  { label: 'Female', value: 'female' },
-                ],
-                handleGenderSelect
-              );
-            }}
-          >
-            <Text style={styles.selectButtonText}>
-              {aiFormData.gender === 'male' ? 'Male' : 'Female'}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color="#fff" />
-          </TouchableOpacity>
+        <View style={styles.aiSection}>
+          <Text style={styles.aiSectionTitle}>Body Measurements</Text>
+          <View style={styles.aiInputGroup}>
+            <View style={styles.aiInputRow}>
+              <View style={[styles.aiInput, { flex: 1, marginRight: 8 }]}>
+                <Text style={styles.label}>Weight (kg)</Text>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="numeric"
+                  value={aiFormData.weight > 0 ? aiFormData.weight.toString() : ''}
+                  onChangeText={(value) => setAiFormData({ ...aiFormData, weight: parseInt(value) || 0 })}
+                  placeholder="Enter weight"
+                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                />
+              </View>
+              <View style={[styles.aiInput, { flex: 1, marginLeft: 8 }]}>
+                <Text style={styles.label}>Height (cm)</Text>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="numeric"
+                  value={aiFormData.height > 0 ? aiFormData.height.toString() : ''}
+                  onChangeText={(value) => setAiFormData({ ...aiFormData, height: parseInt(value) || 0 })}
+                  placeholder="Enter height"
+                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                />
+              </View>
+            </View>
+          </View>
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Weight (kg)</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={aiFormData.weight > 0 ? aiFormData.weight.toString() : ''}
-            onChangeText={(value) => setAiFormData({ ...aiFormData, weight: parseInt(value) || 0 })}
-            placeholder="Enter your weight in kg"
-            placeholderTextColor="rgba(255, 255, 255, 0.5)"
-          />
+        <View style={styles.aiSection}>
+          <Text style={styles.aiSectionTitle}>Lifestyle & Goals</Text>
+          <View style={styles.aiInputGroup}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Activity Level</Text>
+              <TouchableOpacity 
+                style={styles.selectButton}
+                onPress={() => {
+                  showOptionPicker(
+                    'Select Activity Level',
+                    [
+                      { label: 'Sedentary (little/no exercise)', value: 'sedentary' },
+                      { label: 'Lightly Active (1-3 days/week)', value: 'lightly_active' },
+                      { label: 'Moderately Active (3-5 days/week)', value: 'moderately_active' },
+                      { label: 'Very Active (6-7 days/week)', value: 'very_active' },
+                      { label: 'Super Active (athlete/physical job)', value: 'super_active' },
+                    ],
+                    handleActivityLevelSelect
+                  );
+                }}
+              >
+                <Text style={styles.selectButtonText}>
+                  {aiFormData.activityLevel === 'sedentary' ? 'Sedentary (little/no exercise)' :
+                   aiFormData.activityLevel === 'lightly_active' ? 'Lightly Active (1-3 days/week)' :
+                   aiFormData.activityLevel === 'moderately_active' ? 'Moderately Active (3-5 days/week)' :
+                   aiFormData.activityLevel === 'very_active' ? 'Very Active (6-7 days/week)' :
+                   'Super Active (athlete/physical job)'}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Health Goal</Text>
+              <TouchableOpacity 
+                style={styles.selectButton}
+                onPress={() => {
+                  showOptionPicker(
+                    'Select Health Goal',
+                    [
+                      { label: 'Maintain Weight', value: 'maintain' },
+                      { label: 'Lose Weight', value: 'lose' },
+                      { label: 'Gain Weight', value: 'gain' },
+                    ],
+                    handleHealthGoalSelect
+                  );
+                }}
+              >
+                <Text style={styles.selectButtonText}>
+                  {aiFormData.healthGoal === 'maintain' ? 'Maintain Weight' :
+                   aiFormData.healthGoal === 'lose' ? 'Lose Weight' :
+                   'Gain Weight'}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Height (cm)</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={aiFormData.height > 0 ? aiFormData.height.toString() : ''}
-            onChangeText={(value) => setAiFormData({ ...aiFormData, height: parseInt(value) || 0 })}
-            placeholder="Enter your height in cm"
-            placeholderTextColor="rgba(255, 255, 255, 0.5)"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Activity Level</Text>
-          <TouchableOpacity 
-            style={styles.selectButton}
-            onPress={() => {
-              showOptionPicker(
-                'Select Activity Level',
-                [
-                  { label: 'Sedentary (little/no exercise)', value: 'sedentary' },
-                  { label: 'Lightly Active (1-3 days/week)', value: 'lightly_active' },
-                  { label: 'Moderately Active (3-5 days/week)', value: 'moderately_active' },
-                  { label: 'Very Active (6-7 days/week)', value: 'very_active' },
-                  { label: 'Super Active (athlete/physical job)', value: 'super_active' },
-                ],
-                handleActivityLevelSelect
-              );
-            }}
-          >
-            <Text style={styles.selectButtonText}>
-              {aiFormData.activityLevel === 'sedentary' ? 'Sedentary (little/no exercise)' :
-               aiFormData.activityLevel === 'lightly_active' ? 'Lightly Active (1-3 days/week)' :
-               aiFormData.activityLevel === 'moderately_active' ? 'Moderately Active (3-5 days/week)' :
-               aiFormData.activityLevel === 'very_active' ? 'Very Active (6-7 days/week)' :
-               'Super Active (athlete/physical job)'}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Health Goal</Text>
-          <TouchableOpacity 
-            style={styles.selectButton}
-            onPress={() => {
-              showOptionPicker(
-                'Select Health Goal',
-                [
-                  { label: 'Maintain Weight', value: 'maintain' },
-                  { label: 'Lose Weight', value: 'lose' },
-                  { label: 'Gain Weight', value: 'gain' },
-                ],
-                handleHealthGoalSelect
-              );
-            }}
-          >
-            <Text style={styles.selectButtonText}>
-              {aiFormData.healthGoal === 'maintain' ? 'Maintain Weight' :
-               aiFormData.healthGoal === 'lose' ? 'Lose Weight' : 'Gain Weight'}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={styles.button} onPress={handleAICalculation}>
+        <TouchableOpacity
+          style={[styles.button, styles.calculateButton]}
+          onPress={handleAICalculation}
+        >
           <LinearGradient
             colors={['#4C6EF5', '#3D5AFE']}
             style={styles.buttonGradient}
@@ -560,11 +605,21 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 20,
   },
+  labelContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   label: {
     color: '#fff',
     fontSize: 16,
     marginBottom: 8,
     fontWeight: '500',
+  },
+  currentValue: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
   },
   input: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -603,6 +658,34 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  aiFormContainer: {
+    flex: 1,
+    paddingBottom: 24,
+  },
+  aiSection: {
+    marginBottom: 24,
+  },
+  aiSectionTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  aiInputGroup: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 16,
+  },
+  aiInputRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  aiInput: {
+    flex: 1,
+  },
+  calculateButton: {
+    marginTop: 32,
   },
   actionSheet: {
     backgroundColor: '#0A1128',
