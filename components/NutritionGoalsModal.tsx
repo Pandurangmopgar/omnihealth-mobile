@@ -84,6 +84,8 @@ export const NutritionGoalsModal: React.FC<NutritionGoalsModalProps> = ({
   const [aiFormData, setAiFormData] = useState<AIGoalCalculationInput>(defaultAIInput);
   const [isLoading, setIsLoading] = useState(false);
   const [actionSheetConfig, setActionSheetConfig] = useState<ActionSheetConfig | null>(null);
+  const [currentStep, setCurrentStep] = useState(0);
+  const totalSteps = 3;
   const slideAnimation = useRef(new Animated.Value(0)).current;
   const fadeAnimation = useRef(new Animated.Value(0)).current;
   const actionSheetRef = useRef<ActionSheetRef>(null);
@@ -305,152 +307,218 @@ export const NutritionGoalsModal: React.FC<NutritionGoalsModalProps> = ({
     </ScrollView>
   );
 
-  const renderAIForm = () => (
-    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-      <View style={styles.aiFormContainer}>
-        <View style={styles.aiSection}>
-          <Text style={styles.aiSectionTitle}>Basic Information</Text>
-          <View style={styles.aiInputGroup}>
-            <View style={styles.aiInputRow}>
-              <View style={[styles.aiInput, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.label}>Age</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="numeric"
-                  value={aiFormData.age > 0 ? aiFormData.age.toString() : ''}
-                  onChangeText={(value) => setAiFormData({ ...aiFormData, age: parseInt(value) || 0 })}
-                  placeholder="Enter age"
-                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                />
-              </View>
-              <View style={[styles.aiInput, { flex: 1, marginLeft: 8 }]}>
-                <Text style={styles.label}>Gender</Text>
-                <TouchableOpacity 
-                  style={styles.selectButton}
-                  onPress={() => {
-                    showOptionPicker(
-                      'Select Gender',
-                      [
-                        { label: 'Male', value: 'male' },
-                        { label: 'Female', value: 'female' },
-                      ],
-                      handleGenderSelect
-                    );
-                  }}
-                >
-                  <Text style={styles.selectButtonText}>
-                    {aiFormData.gender === 'male' ? 'Male' : 'Female'}
-                  </Text>
-                  <Ionicons name="chevron-down" size={20} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.aiSection}>
-          <Text style={styles.aiSectionTitle}>Body Measurements</Text>
-          <View style={styles.aiInputGroup}>
-            <View style={styles.aiInputRow}>
-              <View style={[styles.aiInput, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.label}>Weight (kg)</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="numeric"
-                  value={aiFormData.weight > 0 ? aiFormData.weight.toString() : ''}
-                  onChangeText={(value) => setAiFormData({ ...aiFormData, weight: parseInt(value) || 0 })}
-                  placeholder="Enter weight"
-                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                />
-              </View>
-              <View style={[styles.aiInput, { flex: 1, marginLeft: 8 }]}>
-                <Text style={styles.label}>Height (cm)</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="numeric"
-                  value={aiFormData.height > 0 ? aiFormData.height.toString() : ''}
-                  onChangeText={(value) => setAiFormData({ ...aiFormData, height: parseInt(value) || 0 })}
-                  placeholder="Enter height"
-                  placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                />
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.aiSection}>
-          <Text style={styles.aiSectionTitle}>Lifestyle & Goals</Text>
-          <View style={styles.aiInputGroup}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Activity Level</Text>
-              <TouchableOpacity 
-                style={styles.selectButton}
-                onPress={() => {
-                  showOptionPicker(
-                    'Select Activity Level',
-                    [
-                      { label: 'Sedentary (little/no exercise)', value: 'sedentary' },
-                      { label: 'Lightly Active (1-3 days/week)', value: 'lightly_active' },
-                      { label: 'Moderately Active (3-5 days/week)', value: 'moderately_active' },
-                      { label: 'Very Active (6-7 days/week)', value: 'very_active' },
-                      { label: 'Super Active (athlete/physical job)', value: 'super_active' },
-                    ],
-                    handleActivityLevelSelect
-                  );
-                }}
-              >
-                <Text style={styles.selectButtonText}>
-                  {aiFormData.activityLevel === 'sedentary' ? 'Sedentary (little/no exercise)' :
-                   aiFormData.activityLevel === 'lightly_active' ? 'Lightly Active (1-3 days/week)' :
-                   aiFormData.activityLevel === 'moderately_active' ? 'Moderately Active (3-5 days/week)' :
-                   aiFormData.activityLevel === 'very_active' ? 'Very Active (6-7 days/week)' :
-                   'Super Active (athlete/physical job)'}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Health Goal</Text>
-              <TouchableOpacity 
-                style={styles.selectButton}
-                onPress={() => {
-                  showOptionPicker(
-                    'Select Health Goal',
-                    [
-                      { label: 'Maintain Weight', value: 'maintain' },
-                      { label: 'Lose Weight', value: 'lose' },
-                      { label: 'Gain Weight', value: 'gain' },
-                    ],
-                    handleHealthGoalSelect
-                  );
-                }}
-              >
-                <Text style={styles.selectButtonText}>
-                  {aiFormData.healthGoal === 'maintain' ? 'Maintain Weight' :
-                   aiFormData.healthGoal === 'lose' ? 'Lose Weight' :
-                   'Gain Weight'}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.button, styles.calculateButton]}
-          onPress={handleAICalculation}
-        >
-          <LinearGradient
-            colors={['#4C6EF5', '#3D5AFE']}
-            style={styles.buttonGradient}
-          >
-            <Text style={styles.buttonText}>Calculate Goals</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+  const renderProgressBar = () => (
+    <View style={styles.progressContainer}>
+      <View style={styles.progressSteps}>
+        {Array(totalSteps).fill(0).map((_, index) => (
+          <React.Fragment key={index}>
+            {index > 0 && <View style={[styles.progressLine, index <= currentStep && styles.progressLineActive]} />}
+            <TouchableOpacity 
+              onPress={() => setCurrentStep(index)}
+              style={[styles.progressDot, index <= currentStep && styles.progressDotActive]}
+            >
+              <Text style={[styles.progressNumber, index <= currentStep && styles.progressNumberActive]}>
+                {index + 1}
+              </Text>
+            </TouchableOpacity>
+          </React.Fragment>
+        ))}
       </View>
-    </ScrollView>
+      <View style={styles.progressLabels}>
+        <Text style={styles.progressLabel}>Basic Info</Text>
+        <Text style={styles.progressLabel}>Body Stats</Text>
+        <Text style={styles.progressLabel}>Lifestyle</Text>
+      </View>
+    </View>
   );
+
+  const renderBasicInfoStep = () => (
+    <Animated.View style={styles.stepCard}>
+      <View style={styles.stepHeader}>
+        <Ionicons name="person" size={24} color="#4C6EF5" />
+        <Text style={styles.stepTitle}>Tell us about yourself</Text>
+      </View>
+      <View style={styles.stepContent}>
+        <View style={styles.aiInputRow}>
+          <View style={[styles.aiInput, { flex: 1, marginRight: 8 }]}>
+            <Text style={styles.label}>Age</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={aiFormData.age > 0 ? aiFormData.age.toString() : ''}
+              onChangeText={(value) => setAiFormData({ ...aiFormData, age: parseInt(value) || 0 })}
+              placeholder="Enter age"
+              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+            />
+          </View>
+          <View style={[styles.aiInput, { flex: 1, marginLeft: 8 }]}>
+            <Text style={styles.label}>Gender</Text>
+            <TouchableOpacity 
+              style={styles.selectButton}
+              onPress={() => {
+                showOptionPicker(
+                  'Select Gender',
+                  [
+                    { label: 'Male', value: 'male' },
+                    { label: 'Female', value: 'female' },
+                  ],
+                  handleGenderSelect
+                );
+              }}
+            >
+              <Text style={styles.selectButtonText}>
+                {aiFormData.gender === 'male' ? 'Male' : 'Female'}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Animated.View>
+  );
+
+  const renderBodyStatsStep = () => (
+    <Animated.View style={styles.stepCard}>
+      <View style={styles.stepHeader}>
+        <Ionicons name="fitness" size={24} color="#4C6EF5" />
+        <Text style={styles.stepTitle}>Your body measurements</Text>
+      </View>
+      <View style={styles.stepContent}>
+        <View style={styles.aiInputRow}>
+          <View style={[styles.aiInput, { flex: 1, marginRight: 8 }]}>
+            <Text style={styles.label}>Weight (kg)</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={aiFormData.weight > 0 ? aiFormData.weight.toString() : ''}
+              onChangeText={(value) => setAiFormData({ ...aiFormData, weight: parseInt(value) || 0 })}
+              placeholder="Enter weight"
+              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+            />
+          </View>
+          <View style={[styles.aiInput, { flex: 1, marginLeft: 8 }]}>
+            <Text style={styles.label}>Height (cm)</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={aiFormData.height > 0 ? aiFormData.height.toString() : ''}
+              onChangeText={(value) => setAiFormData({ ...aiFormData, height: parseInt(value) || 0 })}
+              placeholder="Enter height"
+              placeholderTextColor="rgba(255, 255, 255, 0.5)"
+            />
+          </View>
+        </View>
+      </View>
+    </Animated.View>
+  );
+
+  const renderLifestyleStep = () => (
+    <Animated.View style={styles.stepCard}>
+      <View style={styles.stepHeader}>
+        <Ionicons name="trending-up" size={24} color="#4C6EF5" />
+        <Text style={styles.stepTitle}>Your lifestyle & goals</Text>
+      </View>
+      <View style={styles.stepContent}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Activity Level</Text>
+          <TouchableOpacity 
+            style={styles.selectButton}
+            onPress={() => {
+              showOptionPicker(
+                'Select Activity Level',
+                [
+                  { label: 'Sedentary (little/no exercise)', value: 'sedentary' },
+                  { label: 'Lightly Active (1-3 days/week)', value: 'lightly_active' },
+                  { label: 'Moderately Active (3-5 days/week)', value: 'moderately_active' },
+                  { label: 'Very Active (6-7 days/week)', value: 'very_active' },
+                  { label: 'Super Active (athlete/physical job)', value: 'super_active' },
+                ],
+                handleActivityLevelSelect
+              );
+            }}
+          >
+            <Text style={styles.selectButtonText}>
+              {aiFormData.activityLevel === 'sedentary' ? 'Sedentary (little/no exercise)' :
+               aiFormData.activityLevel === 'lightly_active' ? 'Lightly Active (1-3 days/week)' :
+               aiFormData.activityLevel === 'moderately_active' ? 'Moderately Active (3-5 days/week)' :
+               aiFormData.activityLevel === 'very_active' ? 'Very Active (6-7 days/week)' :
+               'Super Active (athlete/physical job)'}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Health Goal</Text>
+          <TouchableOpacity 
+            style={styles.selectButton}
+            onPress={() => {
+              showOptionPicker(
+                'Select Health Goal',
+                [
+                  { label: 'Maintain Weight', value: 'maintain' },
+                  { label: 'Lose Weight', value: 'lose' },
+                  { label: 'Gain Weight', value: 'gain' },
+                ],
+                handleHealthGoalSelect
+              );
+            }}
+          >
+            <Text style={styles.selectButtonText}>
+              {aiFormData.healthGoal === 'maintain' ? 'Maintain Weight' :
+               aiFormData.healthGoal === 'lose' ? 'Lose Weight' :
+               'Gain Weight'}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Animated.View>
+  );
+
+  const renderAIForm = () => {
+    return (
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.aiFormContainer}>
+          {renderProgressBar()}
+          
+          {currentStep === 0 && renderBasicInfoStep()}
+          {currentStep === 1 && renderBodyStatsStep()}
+          {currentStep === 2 && renderLifestyleStep()}
+
+          <View style={styles.navigationButtons}>
+            {currentStep > 0 && (
+              <TouchableOpacity
+                style={[styles.navButton, styles.backButton]}
+                onPress={() => setCurrentStep(currentStep - 1)}
+              >
+                <Ionicons name="arrow-back" size={20} color="#fff" />
+                <Text style={styles.navButtonText}>Back</Text>
+              </TouchableOpacity>
+            )}
+            
+            {currentStep < totalSteps - 1 ? (
+              <TouchableOpacity
+                style={[styles.navButton, styles.nextButton]}
+                onPress={() => setCurrentStep(currentStep + 1)}
+              >
+                <Text style={styles.navButtonText}>Next</Text>
+                <Ionicons name="arrow-forward" size={20} color="#fff" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.navButton, styles.calculateButton]}
+                onPress={handleAICalculation}
+              >
+                <Text style={styles.navButtonText}>Calculate</Text>
+                <Ionicons name="calculator" size={20} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    );
+  };
 
   return (
     <Modal
@@ -663,29 +731,102 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingBottom: 24,
   },
-  aiSection: {
+  progressContainer: {
     marginBottom: 24,
   },
-  aiSectionTitle: {
+  progressSteps: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  progressDot: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressDotActive: {
+    backgroundColor: '#4C6EF5',
+  },
+  progressLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginHorizontal: 4,
+  },
+  progressLineActive: {
+    backgroundColor: '#4C6EF5',
+  },
+  progressNumber: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  progressNumberActive: {
+    color: '#fff',
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    marginTop: 8,
+  },
+  progressLabel: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    textAlign: 'center',
+    flex: 1,
+  },
+  stepCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+  },
+  stepHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  stepTitle: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 16,
+    marginLeft: 12,
   },
-  aiInputGroup: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
-    padding: 16,
+  stepContent: {
+    marginTop: 8,
   },
-  aiInputRow: {
+  navigationButtons: {
     flexDirection: 'row',
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    marginTop: 24,
   },
-  aiInput: {
-    flex: 1,
+  navButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  backButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  nextButton: {
+    backgroundColor: '#4C6EF5',
   },
   calculateButton: {
-    marginTop: 32,
+    backgroundColor: '#4C6EF5',
+  },
+  navButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+    marginHorizontal: 8,
   },
   actionSheet: {
     backgroundColor: '#0A1128',
