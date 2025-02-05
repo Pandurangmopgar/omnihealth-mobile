@@ -873,5 +873,15 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     textAlign: 'center',
     fontWeight: '600',
-  }
+  },
+  aiInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  aiInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+  },
 });

@@ -1676,29 +1676,51 @@ const AnalysisResultsModal = ({ result, visible, onClose }: {
           entering={FadeInDown.duration(300)}
           style={styles.modalContent}
         >
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Analysis Results</Text>
-            <Text style={styles.processingLabel}>
-              {result.basic_info.food_name} - {result.basic_info.portion_size}
-              <Text style={styles.processingBadge}> {result.basic_info.preparation_method}</Text>
-            </Text>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Ionicons name="close" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          <LinearGradient
+            colors={['#4F46E5', '#818CF8']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.modalHeader}
+          >
+            <View style={styles.headerContent}>
+              <View style={styles.foodInfoContainer}>
+                <Text style={styles.modalTitle}>Analysis Results</Text>
+                <Text style={styles.processingLabel}>
+                  {result.basic_info.food_name} - {result.basic_info.portion_size}
+                  {result.basic_info.preparation_method && (
+                    <Text style={styles.processingBadge}> • {result.basic_info.preparation_method}</Text>
+                  )}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={onClose}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close-circle" size={32} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
 
           <ScrollView style={styles.modalBody}>
             {/* Macronutrients Section */}
             <View style={styles.nutrientSection}>
+              <Text style={styles.sectionHeader}>Macronutrients</Text>
               <View style={styles.sectionRow}>
                 <View style={styles.nutrientBox}>
-                  <Ionicons name="flame" size={24} color={COLORS.calories[0]} />
+                  <LinearGradient colors={COLORS.calories} style={styles.iconContainer}>
+                    <Ionicons name="flame" size={24} color="#fff" />
+                  </LinearGradient>
+                  <Text style={styles.nutrientHeader}>Calories</Text>
                   <Text style={styles.nutrientValue}>{result.nutritional_content.calories}</Text>
                   <Text style={styles.nutrientLabel}>kcal</Text>
                   <Text style={styles.nutrientPercentage}>{Math.round(result.nutritional_content.calories / 2000 * 100)}% DV</Text>
                 </View>
                 <View style={styles.nutrientBox}>
-                  <Ionicons name="barbell" size={24} color={COLORS.protein[0]} />
+                  <LinearGradient colors={COLORS.protein} style={styles.iconContainer}>
+                    <Ionicons name="barbell" size={24} color="#fff" />
+                  </LinearGradient>
+                  <Text style={styles.nutrientHeader}>Protein</Text>
                   <Text style={styles.nutrientValue}>{result.nutritional_content.macronutrients.protein.amount}</Text>
                   <Text style={styles.nutrientLabel}>g protein</Text>
                   <Text style={styles.nutrientPercentage}>{result.nutritional_content.macronutrients.protein.daily_value_percentage}% DV</Text>
@@ -1706,13 +1728,19 @@ const AnalysisResultsModal = ({ result, visible, onClose }: {
               </View>
               <View style={styles.sectionRow}>
                 <View style={styles.nutrientBox}>
-                  <Ionicons name="leaf" size={24} color={COLORS.carbs[0]} />
+                  <LinearGradient colors={COLORS.carbs} style={styles.iconContainer}>
+                    <Ionicons name="leaf" size={24} color="#fff" />
+                  </LinearGradient>
+                  <Text style={styles.nutrientHeader}>Carbs</Text>
                   <Text style={styles.nutrientValue}>{result.nutritional_content.macronutrients.carbs.amount}</Text>
                   <Text style={styles.nutrientLabel}>g carbs</Text>
                   <Text style={styles.nutrientPercentage}>{result.nutritional_content.macronutrients.carbs.daily_value_percentage}% DV</Text>
                 </View>
                 <View style={styles.nutrientBox}>
-                  <Ionicons name="water" size={24} color={COLORS.fat[0]} />
+                  <LinearGradient colors={COLORS.fat} style={styles.iconContainer}>
+                    <Ionicons name="water" size={24} color="#fff" />
+                  </LinearGradient>
+                  <Text style={styles.nutrientHeader}>Fats</Text>
                   <Text style={styles.nutrientValue}>{result.nutritional_content.macronutrients.fats.amount}</Text>
                   <Text style={styles.nutrientLabel}>g fats</Text>
                   <Text style={styles.nutrientPercentage}>{result.nutritional_content.macronutrients.fats.daily_value_percentage}% DV</Text>
@@ -1760,7 +1788,7 @@ const AnalysisResultsModal = ({ result, visible, onClose }: {
                 {result.health_analysis.benefits.map((benefit, index) => (
                   <View key={`benefit-${index}`} style={styles.benefitItem}>
                     <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                    <Text style={styles.benefitText}>{benefit}</Text>
+                    <Text style={styles.benefitItem}>{benefit}</Text>
                   </View>
                 ))}
               </View>
@@ -1772,7 +1800,7 @@ const AnalysisResultsModal = ({ result, visible, onClose }: {
                   {result.health_analysis.considerations.map((consideration, index) => (
                     <View key={`consideration-${index}`} style={styles.considerationItem}>
                       <Ionicons name="information-circle" size={20} color="#F59E0B" />
-                      <Text style={styles.considerationText}>{consideration}</Text>
+                      <Text style={styles.considerationItem}>{consideration}</Text>
                     </View>
                   ))}
                 </View>
@@ -3005,11 +3033,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
   },
   inputContainer: {
     marginBottom: 16,
