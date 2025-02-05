@@ -69,19 +69,13 @@ interface NutritionResult {
       carbs: { amount: number; unit: string; daily_value_percentage: number };
       fats: { amount: number; unit: string; daily_value_percentage: number };
     };
-    micronutrients: {
-      vitamins: {
+    vitamins_minerals: {
+      [key: string]: {
         name: string;
         amount: number;
         unit: string;
         daily_value_percentage: number;
-      }[];
-      minerals: {
-        name: string;
-        amount: number;
-        unit: string;
-        daily_value_percentage: number;
-      }[];
+      };
     };
   };
   health_analysis: {
@@ -791,7 +785,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                   <View style={styles.micronutrientSection}>
                     <Text style={styles.sectionSubtitle}>Vitamins & Minerals</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.micronutrientScroll}>
-                      {result?.nutritional_content.micronutrients.vitamins.map((vitamin: { 
+                      {Object.values(result?.nutritional_content.vitamins_minerals || {}).map((vitamin: { 
                         name: string;
                         amount: number;
                         unit: string;
@@ -821,7 +815,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                     </ScrollView>
 
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.micronutrientScroll}>
-                      {result?.nutritional_content.micronutrients.minerals.map((mineral: {
+                      {Object.values(result?.nutritional_content.vitamins_minerals || {}).map((mineral: {
                         name: string;
                         amount: number;
                         unit: string;
@@ -1374,7 +1368,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                 <View style={styles.micronutrientSection}>
                   <Text style={styles.sectionSubtitle}>Vitamins & Minerals</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.micronutrientScroll}>
-                    {result?.nutritional_content.micronutrients.vitamins.map((vitamin: { 
+                    {Object.values(result?.nutritional_content.vitamins_minerals || {}).map((vitamin: { 
                       name: string;
                       amount: number;
                       unit: string;
@@ -1404,7 +1398,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
                   </ScrollView>
 
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.micronutrientScroll}>
-                    {result?.nutritional_content.micronutrients.minerals.map((mineral: {
+                    {Object.values(result?.nutritional_content.vitamins_minerals || {}).map((mineral: {
                       name: string;
                       amount: number;
                       unit: string;
@@ -1730,14 +1724,14 @@ const AnalysisResultsModal = ({ result, visible, onClose }: {
             <View style={styles.micronutrientsSection}>
               <Text style={styles.sectionTitle}>Vitamins & Minerals</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {result.nutritional_content.micronutrients.vitamins.map((vitamin, index) => (
+                {Object.values(result?.nutritional_content.vitamins_minerals || {}).map((vitamin, index) => (
                   <View key={`vitamin-${index}`} style={styles.microCard}>
-                    <Text style={styles.microName}>{vitamin.name}</Text>
-                    <Text style={styles.microValue}>{vitamin.amount}{vitamin.unit}</Text>
+                    <Text style={styles.microName}>{vitamin?.name}</Text>
+                    <Text style={styles.microValue}>{vitamin?.amount}{vitamin?.unit}</Text>
                     <View style={styles.microProgressContainer}>
                       <LinearGradient
                         colors={['#4F46E5', '#818CF8']}
-                        style={[styles.microProgress, { width: `${Math.min(vitamin.daily_value_percentage, 100)}%` }]}
+                        style={[styles.microProgress, { width: `${Math.min(vitamin?.daily_value_percentage, 100)}%` }]}
                       />
                     </View>
                     <Text style={styles.microPercentage}>{vitamin.daily_value_percentage}% DV</Text>
