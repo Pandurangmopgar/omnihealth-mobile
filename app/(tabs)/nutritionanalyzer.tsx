@@ -3785,72 +3785,9 @@ export default function NutritionAnalyzer() {
                 </MotiView>
               )}
 
-              {result && !showDashboard && (
-                <MotiView
-                  from={{ opacity: 0, translateY: 20 }}
-                  animate={{ opacity: 1, translateY: 0 }}
-                  transition={{ type: 'timing', duration: 300 }}
-                  style={styles.resultContainer}
-                >
-                  <View style={styles.resultHeader}>
-                    <View style={styles.resultTitleRow}>
-                      <Text style={styles.foodName}>{result.basic_info.food_name}</Text>
-                      <TouchableOpacity
-                        style={styles.closeButton}
-                        onPress={resetAnalysis}
-                      >
-                        <Ionicons name="close-circle" size={24} color="rgba(255, 255, 255, 0.7)" />
-                      </TouchableOpacity>
-                    </View>
-                    <Text style={styles.mealType}>
-                      <Ionicons name="time" size={16} color="#4C6EF5" /> {result.meal_type}
-                    </Text>
-                    {result.basic_info.portion_size && (
-                      <Text style={styles.portionSize}>
-                        <Ionicons name="restaurant" size={16} color="rgba(255, 255, 255, 0.7)" /> {result.basic_info.portion_size}
-                      </Text>
-                    )}
-                  </View>
-
-                  {result.health_analysis && (
-                    <View style={styles.healthAnalysis}>
-                      <Text style={styles.sectionTitle}>
-                        <Ionicons name={'medical-outline' as keyof typeof Ionicons.glyphMap} size={20} color="#fff" /> Health Analysis
-                      </Text>
-                      {result.health_analysis.benefits.length > 0 && (
-                        <View style={styles.benefitsContainer}>
-                          <Text style={styles.benefitsTitle}>
-                            <Ionicons name="checkmark-circle" size={18} color="#4C6EF5" /> Benefits
-                          </Text>
-                          {result.health_analysis.benefits.map((benefit, index) => (
-                            <Text key={index} style={styles.benefitItem}>• {benefit}</Text>
-                          ))}
-                        </View>
-                      )}
-                      {result.health_analysis.considerations.length > 0 && (
-                        <View style={styles.considerationsContainer}>
-                          <Text style={styles.considerationsTitle}>
-                            <Ionicons name="information-circle" size={18} color="#4C6EF5" /> Considerations
-                          </Text>
-                          {result.health_analysis.considerations.map((consideration, index) => (
-                            <Text key={index} style={styles.considerationItem}>• {consideration}</Text>
-                          ))}
-                        </View>
-                      )}
-                      {result.health_analysis.allergens.length > 0 && (
-                        <View style={styles.allergensContainer}>
-                          <Text style={styles.allergensTitle}>
-                            <Ionicons name="alert-circle" size={18} color="#4C6EF5" /> Allergens
-                          </Text>
-                          {result.health_analysis.allergens.map((allergen, index) => (
-                            <Text key={index} style={styles.allergenItem}>• {allergen}</Text>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                  )}
-                </MotiView>
-              )}
+             
+                    
+                
             </>
           )}
         </ScrollView>
