@@ -33,7 +33,13 @@ const HEALTH_ASSISTANTS = [
     icon: 'restaurant',
     gradient: ['#fbbf24', '#f59e0b'],
   },
-  
+  {
+    id: 'premium',
+    title: 'Premium Features',
+    description: 'Unlock all premium features and get personalized health coaching.',
+    icon: 'star',
+    gradient: ['#4F46E5', '#818CF8'],
+  },
 ];
 
 export default function HomeScreen() {
@@ -49,6 +55,9 @@ export default function HomeScreen() {
     switch (id) {
       case 'nutrition':
         router.push('/(tabs)/nutritionanalyzer');
+        break;
+      case 'premium':
+        router.push('/(tabs)/premium');
         break;
       case 'exercise':
       case 'diet':
