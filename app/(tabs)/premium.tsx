@@ -17,6 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import { StripeProvider, useStripe } from '@stripe/stripe-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RazorpayWebView from '../../components/RazorpayWebView';
+import StripeQRModal from '../../components/StripeQRModal';
 import { createStripePaymentIntent, createRazorpayOrder, createSubscription } from '../../services/payments';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -68,6 +69,15 @@ const PremiumScreen = () => {
   const [selectedPlan, setSelectedPlan] = useState(SUBSCRIPTION_PLANS[0]); // Initialize with first plan
   const [razorpayVisible, setRazorpayVisible] = useState(false);
   const [razorpayOrderId, setRazorpayOrderId] = useState('');
+  const [stripeQRVisible, setStripeQRVisible] = useState(false);
+  const [stripePaymentUrl, setStripePaymentUrl] = useState('');
+  const [isIndianUser, setIsIndianUser] = useState(false);
+
+  useEffect(() => {
+    // Check if user is from India based on their locale or timezone
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    setIsIndianUser(userTimezone.includes('Asia/Kolkata'));
+  }, []);
 
   const handleStripePayment = async () => {
     if (!selectedPlan) {
@@ -133,6 +143,28 @@ const PremiumScreen = () => {
       setRazorpayVisible(true);
     } catch (error) {
       console.error('Error creating Razorpay order:', error);
+      handlePaymentError(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStripeQRPayment = async () => {
+    if (!selectedPlan) {
+      Alert.alert('Select Plan', 'Please select a subscription plan to continue.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { clientSecret } = await createStripePaymentIntent(selectedPlan.price);
+      
+      // In a real app, you would generate a unique payment URL
+      // For demo, we'll use the client secret as the QR code content
+      setStripePaymentUrl(clientSecret);
+      setStripeQRVisible(true);
+    } catch (error) {
+      console.error('Error creating QR payment:', error);
       handlePaymentError(error);
     } finally {
       setLoading(false);
@@ -334,25 +366,29 @@ const PremiumScreen = () => {
                 {loading ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
-                  <Text style={styles.buttonText}>Pay with Stripe</Text>
+                  <Text style={styles.buttonText}>
+                    {isIndianUser ? 'Pay with Card' : 'Pay with Stripe'}
+                  </Text>
                 )}
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.paymentButton, 
-                  styles.razorpayButton,
-                  (!selectedPlan || loading) && styles.disabledButton
-                ]}
-                onPress={handleRazorpayPayment}
-                disabled={!selectedPlan || loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text style={styles.buttonText}>Pay with Razorpay</Text>
-                )}
-              </TouchableOpacity>
+              {isIndianUser && (
+                <TouchableOpacity
+                  style={[
+                    styles.paymentButton, 
+                    styles.razorpayButton,
+                    (!selectedPlan || loading) && styles.disabledButton
+                  ]}
+                  onPress={handleRazorpayPayment}
+                  disabled={!selectedPlan || loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text style={styles.buttonText}>Pay with UPI/QR/NetBanking</Text>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </ScrollView>

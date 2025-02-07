@@ -49,6 +49,43 @@ const RazorpayWebView: React.FC<RazorpayWebViewProps> = ({
               name: '${userName}',
               email: '${userEmail}',
             },
+            config: {
+              display: {
+                blocks: {
+                  utpi: {
+                    name: 'Pay using UPI',
+                    instruments: [
+                      {
+                        method: 'upi',
+                        flows: ['intent', 'collect', 'qr'],
+                        apps: ['google_pay', 'phonepe', 'paytm', 'bhim']
+                      }
+                    ]
+                  },
+                  qr: {
+                    name: 'Pay via QR',
+                    instruments: [
+                      {
+                        method: 'qr',
+                        flows: ['qr']
+                      }
+                    ]
+                  },
+                  other: {
+                    name: 'Other Payment Methods',
+                    instruments: [
+                      { method: 'card' },
+                      { method: 'netbanking' },
+                      { method: 'wallet' }
+                    ]
+                  }
+                },
+                sequence: ['block.utpi', 'block.qr', 'block.other'],
+                preferences: {
+                  show_default_blocks: true
+                }
+              }
+            },
             theme: {
               color: '#4F46E5',
             },
@@ -74,7 +111,6 @@ const RazorpayWebView: React.FC<RazorpayWebViewProps> = ({
             }));
           });
           
-          // Start payment on page load
           setTimeout(() => {
             rzp.open();
           }, 1000);
