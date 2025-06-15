@@ -1,3 +1,4 @@
+import '../polyfills'; // Must be first import
 import { Redirect } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
 

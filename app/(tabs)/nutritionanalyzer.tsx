@@ -60,31 +60,27 @@ interface NutritionResult {
     food_name: string;
     portion_size: string;
     preparation_method: string;
-    total_servings: number;
+    total_servings?: number;
   };
   nutritional_content: {
     calories: number;
     macronutrients: {
-      protein: { amount: number; unit: string; daily_value_percentage: number };
-      carbs: { amount: number; unit: string; daily_value_percentage: number };
-      fats: { amount: number; unit: string; daily_value_percentage: number };
+      protein: { amount: number; unit: string; daily_value_percentage: number | null };
+      carbs: { amount: number; unit: string; daily_value_percentage: number | null };
+      fats: { amount: number; unit: string; daily_value_percentage: number | null };
     };
     vitamins_minerals: {
-      [key: string]: {
-        name: string;
-        amount: number;
-        unit: string;
-        daily_value_percentage: number;
-      };
+      [key: string]: any;
     };
   };
   health_analysis: {
     benefits: string[];
     considerations: string[];
     allergens: string[];
-    processing_level: string;
+    processing_level?: string;
     health_score: {
       score: number;
+      explanation?: string;
       factors: string[];
     };
   };
@@ -1655,7 +1651,7 @@ const NutritionVisualization = ({ result, dailyProgress }: NutritionVisualizatio
       {activeTab === 'report' && renderReportTab()}
     </ScrollView>
   );
-};
+}
 
 const AnalysisResultsModal = ({ result, visible, onClose }: { 
   result: NutritionResult | null; 
@@ -1711,7 +1707,7 @@ const AnalysisResultsModal = ({ result, visible, onClose }: {
                   <LinearGradient colors={COLORS.calories} style={styles.iconContainer}>
                     <Ionicons name="flame" size={24} color="#fff" />
                   </LinearGradient>
-                  <Text style={styles.nutrientHeader}>Calories</Text>
+                  <Text style={styles.nutrientHeaderModal}>Calories</Text>
                   <Text style={styles.nutrientValue}>{result.nutritional_content.calories}</Text>
                   <Text style={styles.nutrientLabel}>kcal</Text>
                   <Text style={styles.nutrientPercentage}>{Math.round(result.nutritional_content.calories / 2000 * 100)}% DV</Text>
@@ -1720,10 +1716,10 @@ const AnalysisResultsModal = ({ result, visible, onClose }: {
                   <LinearGradient colors={COLORS.protein} style={styles.iconContainer}>
                     <Ionicons name="barbell" size={24} color="#fff" />
                   </LinearGradient>
-                  <Text style={styles.nutrientHeader}>Protein</Text>
+                  <Text style={styles.nutrientHeaderModal}>Protein</Text>
                   <Text style={styles.nutrientValue}>{result.nutritional_content.macronutrients.protein.amount}</Text>
                   <Text style={styles.nutrientLabel}>g protein</Text>
-                  <Text style={styles.nutrientPercentage}>{result.nutritional_content.macronutrients.protein.daily_value_percentage}% DV</Text>
+                  <Text style={styles.nutrientPercentage}>{result.nutritional_content.macronutrients.protein.daily_value_percentage || 0}% DV</Text>
                 </View>
               </View>
               <View style={styles.sectionRow}>
@@ -1731,19 +1727,19 @@ const AnalysisResultsModal = ({ result, visible, onClose }: {
                   <LinearGradient colors={COLORS.carbs} style={styles.iconContainer}>
                     <Ionicons name="leaf" size={24} color="#fff" />
                   </LinearGradient>
-                  <Text style={styles.nutrientHeader}>Carbs</Text>
+                  <Text style={styles.nutrientHeaderModal}>Carbs</Text>
                   <Text style={styles.nutrientValue}>{result.nutritional_content.macronutrients.carbs.amount}</Text>
                   <Text style={styles.nutrientLabel}>g carbs</Text>
-                  <Text style={styles.nutrientPercentage}>{result.nutritional_content.macronutrients.carbs.daily_value_percentage}% DV</Text>
+                  <Text style={styles.nutrientPercentage}>{result.nutritional_content.macronutrients.carbs.daily_value_percentage || 0}% DV</Text>
                 </View>
                 <View style={styles.nutrientBox}>
                   <LinearGradient colors={COLORS.fat} style={styles.iconContainer}>
                     <Ionicons name="water" size={24} color="#fff" />
                   </LinearGradient>
-                  <Text style={styles.nutrientHeader}>Fats</Text>
+                  <Text style={styles.nutrientHeaderModal}>Fats</Text>
                   <Text style={styles.nutrientValue}>{result.nutritional_content.macronutrients.fats.amount}</Text>
                   <Text style={styles.nutrientLabel}>g fats</Text>
-                  <Text style={styles.nutrientPercentage}>{result.nutritional_content.macronutrients.fats.daily_value_percentage}% DV</Text>
+                  <Text style={styles.nutrientPercentage}>{result.nutritional_content.macronutrients.fats.daily_value_percentage || 0}% DV</Text>
                 </View>
               </View>
             </View>
@@ -2368,11 +2364,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 16,
   },
-  nutrientDetailsCard: {
-    marginTop: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
   nutrientGridLayout: {
     padding: 16,
   },
@@ -2501,20 +2492,6 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     maxWidth: '60%',
   },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    backgroundColor: 'rgba(30, 41, 59, 0.7)',
-    borderRadius: 16,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#E2E8F0',
-    textAlign: 'center',
-  },
   errorText: {
     color: '#EF4444',
     fontSize: 14,
@@ -2545,6 +2522,31 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
+  // Add missing styles
+  foodInfoContainer: {
+    flex: 1,
+  },
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 16,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nutrientHeaderModal: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  // AI Response formatting
   aiMainHeader: {
     fontSize: 26,
     fontWeight: '700',
@@ -2624,9 +2626,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
   },
-  nutrientGrid: {
-    padding: 16,
-  },
   nutrientDetailItem: {
     marginBottom: 20,
   },
@@ -2635,18 +2634,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
     marginBottom: 4,
-  },
-  nutrientAmount: {
-    fontSize: 14,
-    color: '#E0E0E0',
-    marginBottom: 8,
-  },
-  nutrientProgress: {
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 2,
-    marginTop: 8,
-    overflow: 'hidden',
   },
   trendsContainer: {
     flex: 1,
@@ -2928,7 +2915,7 @@ const styles = StyleSheet.create({
   healthInsightsSection: {
     marginBottom: 24,
   },
-  healthScore: {
+  healthScoreContainer: {
     alignItems: 'center',
     padding: 16,
     backgroundColor: 'rgba(255,255,255,0.05)',
@@ -2986,11 +2973,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#9CA3AF',
   },
-  trendsCardContainer: {
-    marginBottom: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
   chartWrapper: {
     marginVertical: 8,
     borderRadius: 16,
@@ -3042,14 +3024,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontSize: 16,
   },
-  input: {
+  modalInput: {
     backgroundColor: '#374151',
     borderRadius: 8,
     padding: 12,
     color: '#fff',
     fontSize: 16,
   },
-  saveButton: {
+  modalSaveButton: {
     marginTop: 20,
   },
   saveButtonGradient: {
@@ -3104,19 +3086,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  modalContent: {
-    width: '90%',
-    maxWidth: 500,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-  },
   modalTitle: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -3131,17 +3100,8 @@ const styles = StyleSheet.create({
     color: '#10B981',
     fontStyle: 'italic',
   },
-  closeButton: {
-    position: 'absolute',
-    right: 16,
-    top: 16,
-    padding: 8,
-  },
   modalBody: {
     padding: 20,
-  },
-  nutrientSection: {
-    marginBottom: 24,
   },
   sectionRow: {
     flexDirection: 'row',
@@ -3156,22 +3116,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     alignItems: 'center',
   },
-  nutrientValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginTop: 8,
-  },
-  nutrientLabel: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    marginTop: 4,
-  },
-  nutrientPercentage: {
-    fontSize: 12,
-    color: '#10B981',
-    marginTop: 4,
-  },
   micronutrientsSection: {
     marginBottom: 24,
   },
@@ -3185,7 +3129,7 @@ const styles = StyleSheet.create({
   microName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   microValue: {
@@ -3219,7 +3163,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#FFFFFF',
   },
   healthScoreLabel: {
     fontSize: 14,
@@ -3232,20 +3176,20 @@ const styles = StyleSheet.create({
   subsectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#FFFFFF',
     marginBottom: 12,
   },
-  benefitItem: {
+  benefitText: {
     fontSize: 14,
-    color: '#1F2937',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   considerationsSection: {
     marginBottom: 16,
   },
-  considerationItem: {
+  considerationText: {
     fontSize: 14,
-    color: '#1F2937',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   recommendationsSection: {
@@ -3257,12 +3201,12 @@ const styles = StyleSheet.create({
   recommendationTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   recommendationItem: {
     fontSize: 14,
-    color: '#1F2937',
+    color: '#FFFFFF',
     marginBottom: 4,
     paddingLeft: 8,
   },
@@ -3272,6 +3216,7 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
     fontStyle: 'italic',
   },
+  // Modal styles
   modeSelector: {
     flexDirection: 'row',
     marginBottom: 20,
@@ -3321,13 +3266,14 @@ const styles = StyleSheet.create({
     color: '#4B5563',
     fontWeight: '500',
   },
-  input: {
+  formInput: {
     borderWidth: 1,
     borderColor: '#D1D5DB',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     backgroundColor: '#F9FAFB',
+    color: '#1F2937',
   },
   buttonContainer: {
     marginTop: 24,
@@ -3337,7 +3283,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-  saveButton: {
+  primaryButton: {
     backgroundColor: '#4F46E5',
   },
   cancelButton: {
@@ -3345,7 +3291,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#D1D5DB',
   },
-  buttonText: {
+  primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
@@ -3402,9 +3348,10 @@ const generateNutritionTips = (
   return tips;
 };
 
-export default function NutritionAnalyzer() {
+function NutritionAnalyzer() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  
   const { userId } = useAuth();
   const [image, setImage] = useState<string | null>(null);
   const [textInput, setTextInput] = useState('');
@@ -3602,7 +3549,7 @@ export default function NutritionAnalyzer() {
     }
   };
 
-  const handleSaveGoals = async (goals: UserGoalInput) => {
+  const handleSaveGoals = async (goals: any) => {
     if (!userId) return;
     
     try {
@@ -3806,4 +3753,6 @@ export default function NutritionAnalyzer() {
       <StatusBar style="light" />
     </View>
   );
-};
+}
+
+export default NutritionAnalyzer;
