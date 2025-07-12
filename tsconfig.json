@@ -14,7 +14,7 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "lib": ["es6", "dom"],
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "noEmit": true,
     "target": "esnext",
     "skipLibCheck": true

@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 
 export default function TabLayout() {
   const { isSignedIn } = useAuth();
@@ -12,15 +12,13 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#0B1120',
+          backgroundColor: 'transparent',
           height: Platform.OS === 'ios' ? 85 : 65,
           borderTopWidth: 0,
           elevation: 0,
           shadowColor: 'transparent',
           paddingBottom: Platform.OS === 'ios' ? 20 : 0,
           paddingTop: 10,
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
           position: 'absolute',
           bottom: 0,
           left: 0,
@@ -28,21 +26,20 @@ export default function TabLayout() {
           borderWidth: 0,
         },
         tabBarBackground: () => (
-          <LinearGradient
-            colors={['#0B1120', '#1A237E']}
+          <BlurView
+            intensity={20}
             style={{
               position: 'absolute',
               left: 0,
               right: 0,
               top: 0,
               height: '100%',
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
+              backgroundColor: 'rgba(0, 0, 0, 0.3)',
             }}
           />
         ),
-        tabBarActiveTintColor: '#4C6EF5',
-        tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.5)',
+        tabBarActiveTintColor: '#10b981',
+        tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.6)',
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '600',
